@@ -223,7 +223,6 @@ GateKeeper/
                 api.py
             core/
                 config.py
-                security.py
                 dependencies.py
             crud/
                 base.py
@@ -267,8 +266,8 @@ GateKeeper/
         .env
 
     scripts/
-        init.sh
-        init.bat
+        create_db.sh
+        create_db.bat
         start-dev.bat
         start-prod.sh
         start-prod.bat
