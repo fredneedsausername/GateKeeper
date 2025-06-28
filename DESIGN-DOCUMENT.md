@@ -23,33 +23,33 @@ It's important to choose the right stack for the job. This robust and modern com
 
 ### Backend
 - **Language:** Python
-- **Framework:** FastAPI
-- **Auth:** JWT
+- **Framework:** Flask
+- **Auth:** Cookies
 
 ### Database
 - **DBMS:** PostgreSQL
 - **Connector:** psycopg3
 
 ### Production
-- **Deploy**: docker for backend and frontend, database managed separately
+- **Server:** Waitress
 
 ## DB Schema
 
 CREATE DATABASE GateKeeper WITH ENCODING 'UTF8';
 
 -- "Users" is plural to avoid conflict with keyword USER
-CREATE TABLE Users (
+CREATE TABLE IF NOT EXISTS Users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE,
     password VARCHAR(20)
 );
 
-CREATE TABLE Shipyard (
+CREATE TABLE IF NOT EXISTS Shipyard (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50)
 );
 
-CREATE TABLE ActivatorBeacon (
+CREATE TABLE IF NOT EXISTS ActivatorBeacon (
     id SERIAL PRIMARY KEY,
     number INTEGER UNIQUE CHECK (number != 0),
     shipyard_id INTEGER,
@@ -60,24 +60,24 @@ CREATE TABLE ActivatorBeacon (
         ON DELETE CASCADE
 );
 
-CREATE TABLE Tag (
+CREATE TABLE IF NOT EXISTS Tag (
     id SERIAL PRIMARY KEY,
     name VARCHAR(20) UNIQUE,
     remaining_battery REAL,
     packet_counter INTEGER
 );
 
-CREATE TABLE CrewMemberRoles (
+CREATE TABLE IF NOT EXISTS CrewMemberRoles (
     id SERIAL PRIMARY KEY,
     role_name VARCHAR(50)
 );
 
-CREATE TABLE Ship (
+CREATE TABLE IF NOT EXISTS Ship (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100)
 );
 
-CREATE TABLE CrewMember (
+CREATE TABLE IF NOT EXISTS CrewMember (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100),
     role_id INTEGER,
@@ -97,7 +97,7 @@ CREATE TABLE CrewMember (
         ON DELETE SET NULL
 );
 
-CREATE TABLE PermanenceLog (
+CREATE TABLE IF NOT EXISTS PermanenceLog (
     id SERIAL PRIMARY KEY,
     crew_member_id INTEGER,
     shipyard_id INTEGER,
@@ -113,7 +113,7 @@ CREATE TABLE PermanenceLog (
         ON DELETE CASCADE
 );
 
-CREATE TABLE UnassignedTagEntry (
+CREATE TABLE IF NOT EXISTS UnassignedTagEntry (
     id SERIAL PRIMARY KEY,
     tag_id INTEGER,
     shipyard_id INTEGER,
@@ -194,7 +194,6 @@ GateKeeper/
                     EditLog.svelte
             lib/
                 api.js
-                auth.js
                 constants.js
                 utils.js
                 stores.js
@@ -202,74 +201,19 @@ GateKeeper/
             main.js
         public/
             index.html
-            favicon.ico
         package.json
         vite.config.js
         tailwind.config.js
         postcss.config.js
 
     backend/
-        app/
-            api/
-                endpoints/
-                    auth.py
-                    crew_members.py
-                    ships.py
-                    tags.py
-                    entries.py
-                    logs.py
-                    advertisements.py
-                dependencies.py
-                api.py
-            core/
-                config.py
-                dependencies.py
-            crud/
-                base.py
-                crew_member.py
-                ship.py
-                tag.py
-                entry.py
-                log.py
-                user.py
-            db/
-                base.py
-                session.py
-                init_db.py
-            models/
-                __init__.py
-                user.py
-                shipyard.py
-                activator_beacon.py
-                tag.py
-                crew_member.py
-                ship.py
-                permanence_log.py
-                unassigned_tag_entry.py
-            schemas/
-                __init__.py
-                auth.py
-                crew_member.py
-                ship.py
-                tag.py
-                entry.py
-                log.py
-                advertisement.py
-            services/
-                advertisement_processor.py
-                log_manager.py
-                tag_assignment.py
-            __init__.py
-            main.py
+        server.py
         requirements.txt
         .env.example
         .env
 
     scripts/
-        create_db.sh
-        create_db.bat
         start-dev.bat
-        start-prod.sh
         start-prod.bat
 
     .gitignore
