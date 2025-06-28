@@ -145,6 +145,11 @@ GateKeeper/
                     DateTimeSelector.svelte
                     LoadingSpinner.svelte
                     Pagination.svelte
+                    Table.svelte
+                    TableRow.svelte
+                    TableHeader.svelte
+                    ActionButtons.svelte
+                    Form.svelte
                 auth/
                     LoginForm.svelte
                 crew/
@@ -894,7 +899,7 @@ If the past beacon to be triggered has is_first_when_entering set to true, and t
 
 If the past beacon to be triggered has is_first_when_entering set to false, and the current beacon has got it set to true, and they're from the same shipyard, then the person is exiting.
 
-If the past beacon is from another shipyard than the current one, then the advertisement is to be ignored.
+If the past beacon is from another shipyard than the current one, then the advertisement is to be ignored. Since, for the advertisement to be processed, a requirement is for the two activator beacons to be from the same shipyard, then this is the way that the shipyard of a processed advertisement is deduced, by taking either ActivatorBeacons' shipyard_id.
 
 If the past beacon is the same as the current one, then the advertisement is to be ignored.
 
@@ -905,6 +910,8 @@ If the adverisement has past activator id equal to 0 then the advertisement is t
 #### Tags
 
 If the tag name of the advertisement is not found in the table then a new Tag row is created in the db, taking the information from the advertisement, and continue processing the advertisement.
+
+Every single advertisement from a tag updates its battery level, even if the advertisement is not valid.
 
 If the tag of the advertisement hasn't their packet counter already set in the table, then it is set to the one of the advertisement.
 
