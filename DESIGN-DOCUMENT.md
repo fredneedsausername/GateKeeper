@@ -4,6 +4,10 @@ The client is an italian shipyard company with 4000 workers in its high season, 
 
 # Solution
 
+## Timezone management
+
+There is no timezone management in the whole application. It is assumed that every shipyard is in the same timezone.
+
 ## Stack
 
 It's important to choose the right stack for the job. This robust and modern combination ensures a smooth user experience without sacrificing development speed.
