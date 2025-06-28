@@ -261,14 +261,12 @@ GateKeeper/
         .env.example
         .env
 
-    docs/
-        api/
-            openapi.json
-
     scripts/
-        start-dev.sh
+        init.sh
+        init.bat
+        start-dev.bat
         start-prod.sh
-        init-db.sh
+        start-prod.bat
 
     .gitignore
     LICENSE
