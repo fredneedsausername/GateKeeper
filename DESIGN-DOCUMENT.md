@@ -4,9 +4,13 @@ The client is an italian shipyard company with 4000 workers in its high season, 
 
 # Solution
 
-## Timezone management
+## Timezone
 
 There is no timezone management in the whole application. It is assumed that every shipyard is in the same timezone.
+
+## About ORMs
+
+This project is against ORMs, and the raw connector will be used to perform all the operations on the database.
 
 ## Stack
 
