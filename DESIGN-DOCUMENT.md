@@ -129,6 +129,26 @@ CREATE TABLE IF NOT EXISTS UnassignedTagEntry (
         ON DELETE CASCADE
 );
 
+CREATE USER your_user WITH PASSWORD 'your_strong_password';
+
+GRANT CONNECT ON DATABASE your_database_name TO your_user;
+
+GRANT USAGE ON SCHEMA public TO your_user;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO your_user;
+
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO your_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO your_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT USAGE ON SEQUENCES TO your_user;
+
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE USAGE ON SCHEMA public FROM PUBLIC;
+REVOKE TEMPORARY ON DATABASE your_database_name FROM PUBLIC;
+
 ## File structure
 
 The project is a monorepo for ease of development.
@@ -211,6 +231,7 @@ GateKeeper/
         requirements.txt
         .env.example
         .env
+        .venv/
 
     scripts/
         start-dev.bat
