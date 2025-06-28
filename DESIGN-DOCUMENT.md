@@ -228,7 +228,6 @@ GateKeeper/
 
     backend/
         fredcrash/
-          
         server.py
         requirements.txt
         .env.example
