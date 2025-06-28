@@ -227,6 +227,8 @@ GateKeeper/
         postcss.config.js
 
     backend/
+        fredcrash/
+          
         server.py
         requirements.txt
         .env.example
