@@ -24,7 +24,7 @@ It's important to choose the right stack for the job. This robust and modern com
 ### Backend
 - **Language:** Python
 - **Framework:** Flask
-- **Auth:** Cookies
+- **Auth:** JWT
 
 ### Database
 - **DBMS:** PostgreSQL
@@ -37,47 +37,47 @@ It's important to choose the right stack for the job. This robust and modern com
 
 CREATE DATABASE GateKeeper WITH ENCODING 'UTF8';
 
--- "Users" is plural to avoid conflict with keyword USER
-CREATE TABLE IF NOT EXISTS Users (
+-- "users" is plural to avoid conflict with keyword USER
+CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE,
     password VARCHAR(20)
 );
 
-CREATE TABLE IF NOT EXISTS Shipyard (
+CREATE TABLE IF NOT EXISTS shipyard (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50)
 );
 
-CREATE TABLE IF NOT EXISTS ActivatorBeacon (
+CREATE TABLE IF NOT EXISTS activator_beacon (
     id SERIAL PRIMARY KEY,
     number INTEGER UNIQUE CHECK (number != 0),
     shipyard_id INTEGER,
     is_first_when_entering BOOLEAN,
     CONSTRAINT fk_beacon_shipyard 
         FOREIGN KEY (shipyard_id) 
-        REFERENCES Shipyard(id) 
+        REFERENCES shipyard(id) 
         ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS Tag (
+CREATE TABLE IF NOT EXISTS tag (
     id SERIAL PRIMARY KEY,
     name VARCHAR(20) UNIQUE,
     remaining_battery REAL,
     packet_counter INTEGER
 );
 
-CREATE TABLE IF NOT EXISTS CrewMemberRoles (
+CREATE TABLE IF NOT EXISTS crew_member_roles (
     id SERIAL PRIMARY KEY,
     role_name VARCHAR(50)
 );
 
-CREATE TABLE IF NOT EXISTS Ship (
+CREATE TABLE IF NOT EXISTS ship (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100)
 );
 
-CREATE TABLE IF NOT EXISTS CrewMember (
+CREATE TABLE IF NOT EXISTS crew_member (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100),
     role_id INTEGER,
@@ -85,19 +85,19 @@ CREATE TABLE IF NOT EXISTS CrewMember (
     tag_id INTEGER,
     CONSTRAINT fk_crew_role 
         FOREIGN KEY (role_id) 
-        REFERENCES CrewMemberRoles(id) 
+        REFERENCES crew_member_roles(id) 
         ON DELETE CASCADE,
     CONSTRAINT fk_crew_ship 
         FOREIGN KEY (ship_id) 
-        REFERENCES Ship(id) 
+        REFERENCES ship(id) 
         ON DELETE CASCADE,
     CONSTRAINT fk_crew_tag 
         FOREIGN KEY (tag_id) 
-        REFERENCES Tag(id) 
+        REFERENCES tag(id) 
         ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS PermanenceLog (
+CREATE TABLE IF NOT EXISTS permanence_log (
     id SERIAL PRIMARY KEY,
     crew_member_id INTEGER,
     shipyard_id INTEGER,
@@ -105,15 +105,15 @@ CREATE TABLE IF NOT EXISTS PermanenceLog (
     leave_timestamp TIMESTAMP,
     CONSTRAINT fk_log_crew 
         FOREIGN KEY (crew_member_id) 
-        REFERENCES CrewMember(id) 
+        REFERENCES crew_member(id) 
         ON DELETE CASCADE,
     CONSTRAINT fk_log_shipyard 
         FOREIGN KEY (shipyard_id) 
-        REFERENCES Shipyard(id) 
+        REFERENCES shipyard(id) 
         ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS UnassignedTagEntry (
+CREATE TABLE IF NOT EXISTS unassigned_tag_entry (
     id SERIAL PRIMARY KEY,
     tag_id INTEGER,
     shipyard_id INTEGER,
@@ -121,11 +121,11 @@ CREATE TABLE IF NOT EXISTS UnassignedTagEntry (
     is_entering BOOLEAN,
     CONSTRAINT fk_entry_tag 
         FOREIGN KEY (tag_id) 
-        REFERENCES Tag(id) 
+        REFERENCES tag(id) 
         ON DELETE CASCADE,
     CONSTRAINT fk_entry_shipyard 
         FOREIGN KEY (shipyard_id) 
-        REFERENCES Shipyard(id) 
+        REFERENCES shipyard(id) 
         ON DELETE CASCADE
 );
 
@@ -251,7 +251,7 @@ https://api.gatekeeper.example.com/api
 ```
 
 ### Authentication
-All endpoints except `/auth/login` require JWT Bearer token authentication.
+All endpoints require JWT Bearer token authentication.
 
 ```
 Authorization: Bearer <token>
@@ -272,9 +272,6 @@ Authorization: Bearer <token>
 {
   "items": [],
   "total": "integer",
-  "page": "integer",
-  "size": "integer",
-  "pages": "integer"
 }
 ```
 

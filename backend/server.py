@@ -906,10 +906,10 @@ if __name__ == '__main__':
     
     enable_crash_logging("..")
 
-    if flask_port := int(os.getenv('FLASK_PORT')) == None:
+    if (flask_port := int(os.getenv('FLASK_PORT'))) == None:
         raise Exception("FLASK_PORT environment variable needed")
     
-    if flask_env := os.getenv('FLASK_ENV') == None:
+    if (flask_env := os.getenv('FLASK_ENV')) == None:
         raise Exception("FLASK_ENV environment variable needed")
     
     if flask_env == 'production':
@@ -919,4 +919,4 @@ if __name__ == '__main__':
         app.run(debug=True, host='127.0.0.1', port=5000)
     
     else:
-        raise Exception("FLASK_ENV environment variable not recognized")
+        raise Exception(f"FLASK_ENV environment variable not recognized: {flask_env}")
