@@ -170,8 +170,18 @@ GateKeeper/
                     TableHeader.svelte
                     ActionButtons.svelte
                     Form.svelte
+                    ErrorAlert.svelte
+                    EmptyState.svelte
+                    ConfirmDialog.svelte
+                    Toast.svelte
+                    BatteryIndicator.svelte
+                    TagBadge.svelte
+                    CrewMemberCard.svelte
                 auth/
                     LoginForm.svelte
+                    LogoutButton.svelte
+                    UserProfile.svelte
+                    PrivateRoute.svelte
                 crew/
                     CrewMemberTable.svelte
                     CrewMemberForm.svelte
@@ -191,9 +201,17 @@ GateKeeper/
                     LogTable.svelte
                     LogForm.svelte
                     LogFilters.svelte
+                roles/
+                    RoleSelector.svelte
+                shipyards/
+                    ShipyardSelector.svelte
+                activator-beacons/
+                    ActivatorBeaconList.svelte
             routes/
                 Login.svelte
                 Dashboard.svelte
+                NotFound.svelte
+                Unauthorized.svelte
                 crew/
                     ManageCrewMembers.svelte
                     CreateCrewMember.svelte
@@ -214,9 +232,16 @@ GateKeeper/
                     EditLog.svelte
             lib/
                 api.js
+                apiClient.js
+                auth.js
+                errors.js
+                formatters.js
                 constants.js
                 utils.js
-                stores.js
+                stores/
+                    stores.js
+                    authStore.js
+                    filterStore.js
             App.svelte
             main.js
         public/
