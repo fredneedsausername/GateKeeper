@@ -1,0 +1,9 @@
+<svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rounded rectangle with open left side -->
+  <path d="M 7 6 L 7 4 C 7 2.9 7.9 2 9 2 L 19 2 C 20.1 2 21 2.9 21 4 L 21 20 C 21 21.1 20.1 22 19 22 L 9 22 C 7.9 22 7 21.1 7 20 L 7 18" 
+        fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Arrow pointing right -->
+  <path d="M 3 12 L 15 12 M 15 12 L 11 8 M 15 12 L 11 16" 
+        fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

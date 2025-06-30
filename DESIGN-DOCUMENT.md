@@ -157,9 +157,14 @@ GateKeeper/
     frontend/
         src/
             components/
-                common/
+                layout/
                     BaseTemplate.svelte
-                    NavigationBar.svelte
+                    Sidebar.svelte
+                    HeaderBar.svelte
+                    MainContent.svelte
+                    ContentHeader.svelte
+                    FilterBar.svelte
+                common/
                     Modal.svelte
                     SearchDropdown.svelte
                     DateTimeSelector.svelte
@@ -177,6 +182,11 @@ GateKeeper/
                     BatteryIndicator.svelte
                     TagBadge.svelte
                     CrewMemberCard.svelte
+                navigation/
+                    NavigationMenu.svelte
+                    NavigationItem.svelte
+                    UserAvatar.svelte
+                    TimeIndicator.svelte
                 auth/
                     LoginForm.svelte
                     LogoutButton.svelte
@@ -942,7 +952,7 @@ Edge cases are best handled if manually and by the user. They are free to create
 
 ## Base template
 
-The base template roughly follows the paint drawing of it, that is an external part of this document.
+The base template features a 
 
 ## Login 
 
