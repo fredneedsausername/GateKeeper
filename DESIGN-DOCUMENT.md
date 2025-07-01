@@ -257,6 +257,7 @@ GateKeeper/
         public/
             index.html
         package.json
+        package-lock.json
         vite.config.js
         tailwind.config.js
         postcss.config.js
