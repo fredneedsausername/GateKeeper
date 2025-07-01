@@ -952,7 +952,7 @@ Edge cases are best handled if manually and by the user. They are free to create
 
 ## Base template
 
-The base template features a 
+The base template features a sidebar to the left, and a section at the top where the user can check their profile and the name of the ERP.
 
 ## Login 
 
