@@ -1,10 +1,9 @@
-from flask import Flask
+from flask import Flask, request, session, redirect, render_template
 from waitress import serve
 from psycopg.rows import dict_row
 import os
 from psycopg_pool import ConnectionPool
 from functools import wraps
-from flask import session, redirect
 
 def auth_required(fn):
     @wraps(fn)
@@ -40,6 +39,19 @@ def connected_to_database(fn):
     return wrapped_function
 
 app = Flask(__name__)
+
+@app.route("/")
+@auth_required
+def index():
+    return render_template("index.html", username=session.get('user'))
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        return render_template("login.html")
+    
+    if request.method == "POST":
+        AAAAAAAAAAAAAAAAA IMPLEMENT THE POST
 
 
 if __name__ == "__main__":

@@ -1,12 +1,99 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% block css %}{% endblock %}
+    <title>GateKeeper</title>
+    <link rel="stylesheet" href="{{url_for('static', 'output.css')}}">
 </head>
-<body>
-    {% block body %}{% endblock %}
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+        <div class="flex justify-between items-center">
+            <h1 class="text-xl font-semibold text-gray-900">GateKeeper</h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-500">{{"time" + "AAAAAAAAAAAAAAAAAAAAA"}}</span>
+                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <span class="text-white text-sm font-medium">{{username[0].upper() or "AAAAAAAAAAAAAAAAA"}}</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex">
+        <!-- Sidebar -->
+        <nav class="bg-blue-800 w-56 min-h-screen">
+            <div class="p-4">
+                <!-- Menu -->
+                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                    <span class="font-medium">Menu
+                    </span>
+                </a>
+
+                <!-- Log -->
+                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="2" width="16" height="20" rx="2"></rect>
+                        <line x1="7" y1="6" x2="17" y2="6"></line>
+                        <line x1="7" y1="10" x2="14" y2="10"></line>
+                        <line x1="7" y1="14" x2="16" y2="14"></line>
+                        <line x1="7" y1="18" x2="13" y2="18"></line>
+                    </svg>
+                    <span class="font-medium">Log</span>
+                </a>
+
+                <!-- Entry -->
+                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M 7 6 L 7 4 C 7 2.9 7.9 2 9 2 L 19 2 C 20.1 2 21 2.9 21 4 L 21 20 C 21 21.1 20.1 22 19 22 L 9 22 C 7.9 22 7 21.1 7 20 L 7 18"></path>
+                        <path d="M 3 12 L 15 12 M 15 12 L 11 8 M 15 12 L 11 16"></path>
+                    </svg>
+                    <span class="font-medium">Entry</span>
+                </a>
+
+                <!-- Tag -->
+                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <circle cx="12" cy="12" r="4"></circle>
+                    </svg>
+                    <span class="font-medium">Tag</span>
+                </a>
+
+                <!-- Crew -->
+                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="7" r="4"></circle>
+                        <path d="M 12 12 C 7 12 3 15 3 19 L 3 21 C 3 21.5 3.5 22 4 22 L 20 22 C 20.5 22 21 21.5 21 21 L 21 19 C 21 15 17 12 12 12"></path>
+                    </svg>
+                    <span class="font-medium">Crew</span>
+                </a>
+
+                <!-- Navi -->
+                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="1" width="6" height="6"></rect>
+                        <rect x="6" y="7" width="12" height="5"></rect>
+                        <path d="M 3 12 L 6 21 L 12 23 L 18 21 L 21 12 Z"></path>
+                    </svg>
+                    <span class="font-medium">Navi</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 p-6">
+            <!-- Content will go here -->
+             <h1>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</h1>
+             {% block body %}{% endblock %}
+        </main>
+    </div>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>
