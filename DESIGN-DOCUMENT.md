@@ -14,11 +14,11 @@ This project is against ORMs, and the raw connector will be used to perform all 
 
 ## Stack
 
-It's important to choose the right stack for the job. This robust and modern combination ensures a smooth user experience without sacrificing development speed.
+It's important to choose the right stack for the job. This robust combination ensures a smooth user experience without sacrificing development speed.
 
 ### Frontend
 - **Structure:** Multi Page Application
-- **Responsivity:** HTMX and Alpine.js 
+- **Reactivity:** Alpine.js 
 - **Styling:** Tailwind
 
 ### Backend

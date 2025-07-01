@@ -1,12 +1,18 @@
 from flask import Flask
-import os
 from waitress import serve
-from functools import wraps
 from psycopg.rows import dict_row
+import os
 from psycopg_pool import ConnectionPool
 from functools import wraps
+from flask import session, redirect
 
-app = Flask(__name__)
+def auth_required(fn):
+    @wraps(fn)
+    def decorated(*args, **kwargs):
+        if not session.get('user'):
+            return redirect("/login")
+        return fn(*args, **kwargs)
+    return decorated
 
 def get_env(env_var: str):
         ret = os.getenv(env_var)
@@ -15,7 +21,6 @@ def get_env(env_var: str):
         return ret
 
 db_url = get_env("DATABASE_URL")
-
 db_pool = ConnectionPool(
     conninfo=db_url,
     min_size=2,
@@ -33,6 +38,9 @@ def connected_to_database(fn):
                    conn.commit()
                    return ret
     return wrapped_function
+
+app = Flask(__name__)
+
 
 if __name__ == "__main__":
     
