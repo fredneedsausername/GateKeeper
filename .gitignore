@@ -196,3 +196,4 @@ cython_debug/
 # Custom
 TODO-PROJECT.md
 *.exe
+alpine.min.js

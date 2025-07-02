@@ -4,93 +4,348 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GateKeeper</title>
-    <link rel="stylesheet" href="{{url_for('static', filename='output.css')}}">
+    <link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.3/cdn.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #f9fafb;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        /* Header Styles */
+        .header {
+            background-color: white;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            border-bottom: 1px solid #e5e7eb;
+            padding: 16px 24px;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #111827;
+        }
+        
+        .header-user {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .avatar {
+            width: 32px;
+            height: 32px;
+            background-color: #2563eb;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .avatar-text {
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        /* Layout */
+        .main-container {
+            display: flex;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            background-color: #1e40af;
+            min-height: 100vh;
+            width: 224px;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .sidebar-collapsed {
+            width: 80px;
+            padding-right: 16px;
+        }
+        
+        .sidebar-content {
+            padding: 16px;
+        }
+        
+        /* Navigation Items */
+        .nav-item {
+            height: 48px;
+            margin-bottom: 8px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            border: none;
+            background: none;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            font-size: inherit;
+            box-sizing: border-box;
+        }
+        
+        .nav-item:hover {
+            background-color: #1d4ed8;
+            transform: translateX(2px);
+        }
+        
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+        
+        .nav-item-text {
+            font-weight: 500;
+            white-space: nowrap;
+            line-height: 1;
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+            flex: 1;
+        }
+        
+        .sidebar-collapsed .nav-item-text {
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+        
+        .sidebar-collapsed .nav-item {
+            justify-content: flex-start;
+            padding: 12px;
+            width: 100%;
+            min-width: 48px;
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 24px;
+        }
+        
+        .content-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            padding: 24px;
+        }
+        
+        .content-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 16px;
+        }
+        
+        .content-description {
+            color: #4b5563;
+            margin-bottom: 32px;
+        }
+        
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+        
+        @media (min-width: 768px) {
+            .feature-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .feature-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        .feature-card {
+            padding: 16px;
+            border-radius: 8px;
+        }
+        
+        .feature-card-blue {
+            background-color: #eff6ff;
+        }
+        
+        .feature-card-green {
+            background-color: #f0fdf4;
+        }
+        
+        .feature-card-purple {
+            background-color: #faf5ff;
+        }
+        
+        .feature-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .feature-title-blue {
+            color: #1e3a8a;
+        }
+        
+        .feature-title-green {
+            color: #14532d;
+        }
+        
+        .feature-title-purple {
+            color: #581c87;
+        }
+        
+        .feature-description {
+            font-size: 14px;
+        }
+        
+        .feature-description-blue {
+            color: #1d4ed8;
+        }
+        
+        .feature-description-green {
+            color: #15803d;
+        }
+        
+        .feature-description-purple {
+            color: #7c3aed;
+        }
+        
+        /* Utility Classes */
+        .hidden {
+            display: none;
+        }
+        
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body x-data="{ sidebarOpen: true }">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div class="flex justify-between items-center">
-            <h1 class="text-xl font-semibold text-gray-900">GateKeeper</h1>
-            <div class="flex items-center space-x-4">
-                <span class="text-sm text-gray-500">{{"time" + "AAAAAAAAAAAAAAAAAAAAA"}}</span>
-                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                    <span class="text-white text-sm font-medium">{{username[0].upper() or "AAAAAAAAAAAAAAAAA"}}</span>
+    <header class="header">
+        <div class="header-content">
+            <h1 class="header-title">GateKeeper</h1>
+            <div class="header-user">
+                <div class="avatar">
+                    <span class="avatar-text">{{username[0].upper()}}</span>
                 </div>
             </div>
         </div>
     </header>
 
-    <div class="flex">
+    <div class="main-container">
         <!-- Sidebar -->
-        <nav class="bg-blue-800 w-56 min-h-screen">
-            <div class="p-4">
-                <!-- Menu -->
-                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <nav class="sidebar" :class="sidebarOpen ? '' : 'sidebar-collapsed'">
+            <div class="sidebar-content">
+                <!-- Hamburger Menu Toggle -->
+                <button @click="sidebarOpen = !sidebarOpen" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="3" y1="6" x2="21" y2="6"></line>
                         <line x1="3" y1="12" x2="21" y2="12"></line>
                         <line x1="3" y1="18" x2="21" y2="18"></line>
                     </svg>
-                    <span class="font-medium">Menu
-                    </span>
-                </a>
+                    <span class="nav-item-text" x-text="sidebarOpen ? 'Menu' : ''"></span>
+                </button>
 
                 <!-- Log -->
-                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="4" y="2" width="16" height="20" rx="2"></rect>
                         <line x1="7" y1="6" x2="17" y2="6"></line>
                         <line x1="7" y1="10" x2="14" y2="10"></line>
                         <line x1="7" y1="14" x2="16" y2="14"></line>
                         <line x1="7" y1="18" x2="13" y2="18"></line>
                     </svg>
-                    <span class="font-medium">Log</span>
+                    <span class="nav-item-text" x-text="sidebarOpen ? 'Log' : ''"></span>
                 </a>
 
                 <!-- Entry -->
-                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M 7 6 L 7 4 C 7 2.9 7.9 2 9 2 L 19 2 C 20.1 2 21 2.9 21 4 L 21 20 C 21 21.1 20.1 22 19 22 L 9 22 C 7.9 22 7 21.1 7 20 L 7 18"></path>
                         <path d="M 3 12 L 15 12 M 15 12 L 11 8 M 15 12 L 11 16"></path>
                     </svg>
-                    <span class="font-medium">Entry</span>
+                    <span class="nav-item-text" x-text="sidebarOpen ? 'Entry' : ''"></span>
                 </a>
 
                 <!-- Tag -->
-                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"></circle>
                         <circle cx="12" cy="12" r="4"></circle>
                     </svg>
-                    <span class="font-medium">Tag</span>
+                    <span class="nav-item-text" x-text="sidebarOpen ? 'Tag' : ''"></span>
                 </a>
 
                 <!-- Crew -->
-                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="7" r="4"></circle>
                         <path d="M 12 12 C 7 12 3 15 3 19 L 3 21 C 3 21.5 3.5 22 4 22 L 20 22 C 20.5 22 21 21.5 21 21 L 21 19 C 21 15 17 12 12 12"></path>
                     </svg>
-                    <span class="font-medium">Crew</span>
+                    <span class="nav-item-text" x-text="sidebarOpen ? 'Crew' : ''"></span>
                 </a>
 
                 <!-- Navi -->
-                <a href="#" class="flex items-center space-x-3 text-white hover:bg-blue-700 rounded-lg p-3 mb-2">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="9" y="1" width="6" height="6"></rect>
                         <rect x="6" y="7" width="12" height="5"></rect>
                         <path d="M 3 12 L 6 21 L 12 23 L 18 21 L 21 12 Z"></path>
                     </svg>
-                    <span class="font-medium">Navi</span>
+                    <span class="nav-item-text" x-text="sidebarOpen ? 'Navi' : ''"></span>
                 </a>
             </div>
         </nav>
 
         <!-- Main Content Area -->
-        <main class="flex-1 p-6">
-            <!-- Content will go here -->
-             <h1>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</h1>
-             {% block body %}{% endblock %}
+        <main class="main-content">
+            <div class="content-card">
+                <h2 class="content-title">Welcome to GateKeeper</h2>
+                <p class="content-description">Click the hamburger menu to toggle the sidebar. The main content area will expand and contract smoothly.</p>
+                <div class="feature-grid">
+                    <div class="feature-card feature-card-blue">
+                        <h3 class="feature-title feature-title-blue">Feature 1</h3>
+                        <p class="feature-description feature-description-blue">Sample content that demonstrates the layout.</p>
+                    </div>
+                    <div class="feature-card feature-card-green">
+                        <h3 class="feature-title feature-title-green">Feature 2</h3>
+                        <p class="feature-description feature-description-green">More sample content for testing.</p>
+                    </div>
+                    <div class="feature-card feature-card-purple">
+                        <h3 class="feature-title feature-title-purple">Feature 3</h3>
+                        <p class="feature-description feature-description-purple">Additional content to show responsiveness.</p>
+                    </div>
+                </div>
+            </div>
+            {% block body %}{% endblock %}
         </main>
     </div>
 

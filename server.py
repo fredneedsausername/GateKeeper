@@ -40,6 +40,12 @@ def connected_to_database(fn):
 
 app = Flask(__name__)
 
+@app.context_processor
+def inject_global_vars():
+    return {
+        'username': session.get("user", "Non riconosciuto"),
+    }
+
 secret_key = get_env("SECRET_KEY")
 
 app.secret_key = str(secret_key)
@@ -57,8 +63,36 @@ def login():
 
     if request.method == "POST":
         data = request.get_json()
-        data.get("body")        
+        username = data.get('username')
+        password = data.get('password')
+        
+        @connected_to_database
+        def fetch_username(curs):
+            curs.execute("""
+            SELECT username
+            FROM users
+            WHERE password=%s        
+            """, (password,))
 
+            return curs.fetchone()
+
+        if fetch_username():
+            session["user"] = username
+            return jsonify({
+                "message": "Login effettuato con successo",
+                "redirect": "/"
+            }), 200
+        else:
+            return jsonify({
+                "error": "Credenziali incorrette"
+            })
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+# @app.route("/")
 
 if __name__ == "__main__":
     
@@ -67,7 +101,10 @@ if __name__ == "__main__":
 
     match flask_env:
         case "development":
-            app.run(debug=True, port=flask_port, host="127.0.0.1")
+            try:
+                app.run(debug=True, port=flask_port, host="127.0.0.1")
+            except SystemExit:
+                db_pool.close(timeout=0)
         case "production":
             serve(app, port=flask_port, host="0.0.0.0")
         case _:
