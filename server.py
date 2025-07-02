@@ -1,4 +1,4 @@
-from flask import Flask, request, session, redirect, render_template
+from flask import Flask, request, session, redirect, render_template, jsonify
 from waitress import serve
 from psycopg.rows import dict_row
 import os
@@ -40,18 +40,24 @@ def connected_to_database(fn):
 
 app = Flask(__name__)
 
+secret_key = get_env("SECRET_KEY")
+
+app.secret_key = str(secret_key)
+
 @app.route("/")
 @auth_required
 def index():
-    return render_template("index.html", username=session.get('user'))
+    return render_template("index.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+
     if request.method == "GET":
         return render_template("login.html")
-    
+
     if request.method == "POST":
-        AAAAAAAAAAAAAAAAA IMPLEMENT THE POST
+        data = request.get_json()
+        data.get("body")        
 
 
 if __name__ == "__main__":

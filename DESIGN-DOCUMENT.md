@@ -24,7 +24,7 @@ It's important to choose the right stack for the job. This robust combination en
 ### Backend
 - **Language:** Python
 - **Framework:** Flask
-- **Auth:** JWT
+- **Auth:** Cookies
 
 ### Database
 - **DBMS:** PostgreSQL
