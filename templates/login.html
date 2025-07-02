@@ -51,10 +51,12 @@
         }
 
         .message {
-            margin-bottom: 1rem;
-            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            text-align: center;
             border-radius: 0.25rem;
             border: 1px solid;
+            font-size: 1rem;
         }
 
         .error-message {
@@ -202,13 +204,11 @@
         <!-- Login Form -->
         <div class="form-container">
             <!-- Error Message -->
-            <div x-show="errorMessage" x-transition x-cloak class="message error-message">
-                <p x-text="errorMessage"></p>
+            <div x-show="errorMessage" x-transition x-cloak class="message error-message" x-text="errorMessage">
             </div>
 
             <!-- Success Message -->
-            <div x-show="successMessage" x-transition x-cloak class="message success-message">
-                <p x-text="successMessage"></p>
+            <div x-show="successMessage" x-transition x-cloak class="message success-message" x-text="successMessage">
             </div>
 
             <form @submit.prevent="submitForm" class="form">

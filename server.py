@@ -85,7 +85,7 @@ def login():
         else:
             return jsonify({
                 "error": "Credenziali incorrette"
-            })
+            }), 401
 
 @app.route("/logout")
 def logout():
