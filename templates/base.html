@@ -27,33 +27,33 @@
         }
         
         /* Header Styles */
-        .header {
+        .base-header {
             background-color: white;
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
             border-bottom: 1px solid #e5e7eb;
             padding: 16px 24px;
         }
         
-        .header-content {
+        .base-header-content {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         
-        .header-title {
+        .base-header-title {
             font-size: 20px;
             font-weight: 600;
             color: #111827;
         }
         
-        .header-user {
+        .base-header-user {
             display: flex;
             align-items: center;
             gap: 16px;
             position: relative;
         }
         
-        .avatar {
+        .base-avatar {
             width: 32px;
             height: 32px;
             background-color: #2563eb;
@@ -65,19 +65,19 @@
             transition: all 0.2s ease-in-out;
         }
         
-        .avatar:hover {
+        .base-avatar:hover {
             background-color: #1d4ed8;
             transform: scale(1.05);
         }
         
-        .avatar-text {
+        .base-avatar-text {
             color: white;
             font-size: 14px;
             font-weight: 500;
         }
         
         /* Dropdown Styles */
-        .dropdown {
+        .base-dropdown {
             position: absolute;
             top: 100%;
             right: 0;
@@ -91,25 +91,25 @@
             overflow: hidden;
         }
         
-        .dropdown-header {
+        .base-dropdown-header {
             padding: 16px 20px;
             border-bottom: 1px solid #e5e7eb;
             background-color: #f9fafb;
             white-space: nowrap;
         }
         
-        .dropdown-greeting {
+        .base-dropdown-greeting {
             font-size: 18px;
             font-weight: 600;
             color: #111827;
         }
         
-        .dropdown-content {
+        .base-dropdown-content {
             padding: 0;
             background-color: #dc2626;
         }
         
-        .dropdown-item {
+        .base-dropdown-item {
             display: flex;
             align-items: center;
             gap: 12px;
@@ -126,50 +126,50 @@
             font-size: 16px;
         }
         
-        .dropdown-item:hover {
+        .base-dropdown-item:hover {
             background-color: #f3f4f6;
         }
         
-        .dropdown-item svg {
+        .base-dropdown-item svg {
             width: 16px;
             height: 16px;
             flex-shrink: 0;
         }
         
-        .dropdown-item.logout {
+        .base-dropdown-item.base-logout {
             color: white;
             justify-content: center;
             font-weight: 500;
         }
         
-        .dropdown-item.logout:hover {
+        .base-dropdown-item.base-logout:hover {
             background-color: #b91c1c;
         }
         
         /* Layout */
-        .main-container {
+        .base-main-container {
             display: flex;
         }
         
         /* Sidebar Styles */
-        .sidebar {
+        .base-sidebar {
             background-color: #1e40af;
             min-height: 100vh;
             width: 224px;
             transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        .sidebar-collapsed {
+        .base-sidebar-collapsed {
             width: 80px;
             padding-right: 16px;
         }
         
-        .sidebar-content {
+        .base-sidebar-content {
             padding: 16px;
         }
         
         /* Navigation Items */
-        .nav-item {
+        .base-nav-item {
             height: 48px;
             margin-bottom: 8px;
             padding: 12px;
@@ -189,18 +189,18 @@
             box-sizing: border-box;
         }
         
-        .nav-item:hover {
+        .base-nav-item:hover {
             background-color: #1d4ed8;
             transform: translateX(2px);
         }
         
-        .nav-item svg {
+        .base-nav-item svg {
             width: 20px;
             height: 20px;
             flex-shrink: 0;
         }
         
-        .nav-item-text {
+        .base-nav-item-text {
             font-weight: 500;
             white-space: nowrap;
             line-height: 1;
@@ -208,12 +208,12 @@
             flex: 1;
         }
         
-        .sidebar-collapsed .nav-item-text {
+        .base-sidebar-collapsed .base-nav-item-text {
             opacity: 0;
             transform: translateX(-10px);
         }
         
-        .sidebar-collapsed .nav-item {
+        .base-sidebar-collapsed .base-nav-item {
             justify-content: flex-start;
             padding: 12px;
             width: 100%;
@@ -221,36 +221,36 @@
         }
         
         /* Main Content */
-        .main-content {
+        .base-main-content {
             flex: 1;
             padding: 24px;
         }
         
-        .content-card {
+        .base-content-card {
             background-color: white;
             border-radius: 8px;
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
             padding: 24px;
         }
         
-        .content-title {
+        .base-content-title {
             font-size: 24px;
             font-weight: 700;
             color: #111827;
             margin-bottom: 16px;
         }
         
-        .content-description {
+        .base-content-description {
             color: #4b5563;
             margin-bottom: 32px;
         }
         
         /* Utility Classes */
-        .hidden {
+        .base-hidden {
             display: none;
         }
         
-        .sr-only {
+        .base-sr-only {
             position: absolute;
             width: 1px;
             height: 1px;
@@ -261,20 +261,519 @@
             white-space: nowrap;
             border: 0;
         }
+
+        /* ========================================= */
+        /* TABLE COMPONENT STYLES */
+        /* ========================================= */
+
+        /* Base Table Container */
+        .base-table-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        /* Base Header Section */
+        .base-table-header {
+            padding: 24px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .base-table-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+
+        .base-table-description {
+            color: #6b7280;
+            margin-bottom: 24px;
+        }
+
+        /* Base Filters Section */
+        .base-filters-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .base-filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 200px;
+        }
+
+        .base-filter-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .base-filter-input, .base-filter-select {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease-in-out;
+            background-color: white;
+        }
+
+        .base-filter-input:focus, .base-filter-select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .base-datetime-input {
+            appearance: none;
+        }
+
+        /* Base Checkbox Filters */
+        .base-checkbox-filters {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .base-checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .base-checkbox {
+            width: 16px;
+            height: 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            appearance: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .base-checkbox:checked {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+
+        .base-checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Base Actions Bar */
+        .base-actions-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .base-filter-reset {
+            background: none;
+            border: 1px solid #d1d5db;
+            color: #6b7280;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .base-filter-reset:hover {
+            border-color: #9ca3af;
+            color: #374151;
+        }
+
+        .base-add-button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .base-add-button:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        /* Base Table Styles */
+        .base-table-wrapper {
+            overflow-x: auto;
+        }
+
+        .base-data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .base-table-header-cell {
+            background-color: #f9fafb;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .base-table-cell {
+            padding: 16px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 14px;
+            color: #111827;
+        }
+
+        .base-table-row {
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .base-table-row:hover {
+            background-color: #f9fafb;
+        }
+
+        /* Base Action Buttons */
+        .base-action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .base-action-button {
+            padding: 6px 8px;
+            border: 1px solid #d1d5db;
+            background-color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .base-action-button:hover {
+            background-color: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .base-action-button.base-edit {
+            color: #2563eb;
+        }
+
+        .base-action-button.base-delete {
+            color: #dc2626;
+        }
+
+        .base-action-button.base-delete:hover {
+            background-color: #fef2f2;
+            border-color: #fca5a5;
+        }
+
+        /* Base Battery Indicator */
+        .base-battery-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .base-battery-icon {
+            font-size: 16px;
+        }
+
+        .base-battery-low {
+            color: #dc2626;
+        }
+
+        .base-battery-medium {
+            color: #f59e0b;
+        }
+
+        .base-battery-high {
+            color: #10b981;
+        }
+
+        /* Base Empty State */
+        .base-empty-state {
+            text-align: center;
+            padding: 64px 24px;
+            color: #6b7280;
+        }
+
+        .base-empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .base-empty-state-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .base-empty-state-description {
+            font-size: 14px;
+        }
+
+        /* Base Loading State */
+        .base-loading-state {
+            text-align: center;
+            padding: 48px 24px;
+        }
+
+        .base-loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #2563eb;
+            border-radius: 50%;
+            animation: base-spin 1s linear infinite;
+            margin: 0 auto 16px auto;
+        }
+
+        @keyframes base-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Base Modal Styles */
+        .base-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .base-modal-content {
+            background-color: white;
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .base-modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 12px;
+        }
+
+        .base-modal-description {
+            color: #6b7280;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+
+        .base-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .base-modal-button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .base-modal-button.base-primary {
+            background-color: #dc2626;
+            color: white;
+            border-color: #dc2626;
+        }
+
+        .base-modal-button.base-primary:hover {
+            background-color: #b91c1c;
+            border-color: #b91c1c;
+        }
+
+        .base-modal-button.base-secondary {
+            background-color: white;
+            color: #374151;
+            border-color: #d1d5db;
+        }
+
+        .base-modal-button.base-secondary:hover {
+            background-color: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        /* Base Pagination */
+        .base-pagination-info {
+            padding: 16px 24px;
+            background-color: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        /* Base Form Styles */
+        .base-form-group {
+            margin-bottom: 20px;
+        }
+
+        .base-form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .base-form-group input,
+        .base-form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .base-form-group input:focus,
+        .base-form-group select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .base-form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .base-btn-primary,
+        .base-btn-secondary {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: 1px solid;
+        }
+
+        .base-btn-primary {
+            background-color: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        .base-btn-primary:hover {
+            background-color: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+
+        .base-btn-secondary {
+            background-color: white;
+            color: #374151;
+            border-color: #d1d5db;
+        }
+
+        .base-btn-secondary:hover {
+            background-color: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        /* Base Responsive Design */
+        @media (max-width: 768px) {
+            .base-filters-section {
+                flex-direction: column;
+            }
+
+            .base-filter-group {
+                min-width: 100%;
+            }
+
+            .base-actions-bar {
+                flex-direction: column;
+                gap: 16px;
+                align-items: stretch;
+            }
+
+            .base-table-wrapper {
+                margin: 0 -24px;
+            }
+
+            .base-table-cell, .base-table-header-cell {
+                padding: 12px 8px;
+                font-size: 13px;
+            }
+
+            .base-action-buttons {
+                flex-direction: column;
+            }
+
+            .base-main-container {
+                flex-direction: column;
+            }
+
+            .base-sidebar {
+                width: 100%;
+                min-height: auto;
+            }
+
+            .base-sidebar-collapsed {
+                width: 100%;
+            }
+
+            .base-main-content {
+                padding: 16px;
+            }
+
+            .base-content-card {
+                padding: 16px;
+            }
+        }
     </style>
 </head>
-<body x-data="{ sidebarOpen: true, dropdownOpen: false }" @click.away="dropdownOpen = false">
+<body x-data="{ baseSidebarOpen: true, baseDropdownOpen: false }" @click.away="baseDropdownOpen = false">
     <!-- Header -->
-    <header class="header">
-        <div class="header-content">
-            <h1 class="header-title">GateKeeper</h1>
-            <div class="header-user">
-                <div class="avatar" @click="dropdownOpen = !dropdownOpen">
-                    <span class="avatar-text">{{username[0].upper()}}</span>
+    <header class="base-header">
+        <div class="base-header-content">
+            <h1 class="base-header-title">GateKeeper</h1>
+            <div class="base-header-user">
+                <div class="base-avatar" @click="baseDropdownOpen = !baseDropdownOpen">
+                    <span class="base-avatar-text">{{username[0].upper()}}</span>
                 </div>
                 
                 <!-- Dropdown Menu -->
-                <div x-show="dropdownOpen" 
+                <div x-show="baseDropdownOpen" 
                      x-cloak
                      x-transition:enter="transition ease-out duration-200"
                      x-transition:enter-start="opacity-0 scale-95"
@@ -282,15 +781,15 @@
                      x-transition:leave="transition ease-in duration-150"
                      x-transition:leave-start="opacity-100 scale-100"
                      x-transition:leave-end="opacity-0 scale-95"
-                     class="dropdown">
+                     class="base-dropdown">
                     
-                    <div class="dropdown-header">
-                        <div class="dropdown-greeting">Ciao, {{username}}!</div>
+                    <div class="base-dropdown-header">
+                        <div class="base-dropdown-greeting">Ciao, {{username}}!</div>
                     </div>
                     
-                    <div class="dropdown-content">
+                    <div class="base-dropdown-content">
                         <form action="/logout" style="margin: 0;">
-                            <button type="submit" class="dropdown-item logout">
+                            <button type="submit" class="base-dropdown-item base-logout">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                                     <polyline points="16,17 21,12 16,7"></polyline>
@@ -305,12 +804,12 @@
         </div>
     </header>
 
-    <div class="main-container">
+    <div class="base-main-container">
         <!-- Sidebar -->
-        <nav class="sidebar" :class="sidebarOpen ? '' : 'sidebar-collapsed'">
-            <div class="sidebar-content">
+        <nav class="base-sidebar" :class="baseSidebarOpen ? '' : 'base-sidebar-collapsed'">
+            <div class="base-sidebar-content">
                 <!-- Hamburger Menu Toggle -->
-                <button @click="sidebarOpen = !sidebarOpen" class="nav-item">
+                <button @click="baseSidebarOpen = !baseSidebarOpen" class="base-nav-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="3" y1="6" x2="21" y2="6"></line>
                         <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -319,7 +818,7 @@
                 </button>
 
                 <!-- Log -->
-                <a href="/log" class="nav-item">
+                <a href="/log" class="base-nav-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="4" y="2" width="16" height="20" rx="2"></rect>
                         <line x1="7" y1="6" x2="17" y2="6"></line>
@@ -327,50 +826,50 @@
                         <line x1="7" y1="14" x2="16" y2="14"></line>
                         <line x1="7" y1="18" x2="13" y2="18"></line>
                     </svg>
-                    <span class="nav-item-text" x-text="sidebarOpen ? 'Log' : ''"></span>
+                    <span class="base-nav-item-text" x-text="baseSidebarOpen ? 'Log' : ''"></span>
                 </a>
 
                 <!-- Entry -->
-                <a href="/entry" class="nav-item">
+                <a href="/entry" class="base-nav-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M 7 6 L 7 4 C 7 2.9 7.9 2 9 2 L 19 2 C 20.1 2 21 2.9 21 4 L 21 20 C 21 21.1 20.1 22 19 22 L 9 22 C 7.9 22 7 21.1 7 20 L 7 18"></path>
                         <path d="M 3 12 L 15 12 M 15 12 L 11 8 M 15 12 L 11 16"></path>
                     </svg>
-                    <span class="nav-item-text" x-text="sidebarOpen ? 'Entry' : ''"></span>
+                    <span class="base-nav-item-text" x-text="baseSidebarOpen ? 'Entry' : ''"></span>
                 </a>
 
                 <!-- Tag -->
-                <a href="/tag" class="nav-item">
+                <a href="/tag" class="base-nav-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"></circle>
                         <circle cx="12" cy="12" r="4"></circle>
                     </svg>
-                    <span class="nav-item-text" x-text="sidebarOpen ? 'Tag' : ''"></span>
+                    <span class="base-nav-item-text" x-text="baseSidebarOpen ? 'Tag' : ''"></span>
                 </a>
 
                 <!-- Crew -->
-                <a href="/crew" class="nav-item">
+                <a href="/crew" class="base-nav-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="7" r="4"></circle>
                         <path d="M 12 12 C 7 12 3 15 3 19 L 3 21 C 3 21.5 3.5 22 4 22 L 20 22 C 20.5 22 21 21.5 21 21 L 21 19 C 21 15 17 12 12 12"></path>
                     </svg>
-                    <span class="nav-item-text" x-text="sidebarOpen ? 'Crew' : ''"></span>
+                    <span class="base-nav-item-text" x-text="baseSidebarOpen ? 'Crew' : ''"></span>
                 </a>
 
                 <!-- Navi -->
-                <a href="/navi" class="nav-item">
+                <a href="/navi" class="base-nav-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="9" y="1" width="6" height="6"></rect>
                         <rect x="6" y="7" width="12" height="5"></rect>
                         <path d="M 3 12 L 6 21 L 12 23 L 18 21 L 21 12 Z"></path>
                     </svg>
-                    <span class="nav-item-text" x-text="sidebarOpen ? 'Navi' : ''"></span>
+                    <span class="base-nav-item-text" x-text="baseSidebarOpen ? 'Navi' : ''"></span>
                 </a>
             </div>
         </nav>
 
         <!-- Main Content Area -->
-        <main class="main-content">
+        <main class="base-main-content">
             {% block body %}{% endblock %}
         </main>
     </div>

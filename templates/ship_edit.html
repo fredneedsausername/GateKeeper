@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="base-content-card">
+    <h2 class="base-content-title">Modifica Nave</h2>
+    <p class="base-content-description">Modifica i dati della nave</p>
+    
+    <form method="POST">
+        <div class="base-form-group">
+            <label for="name">Nome Nave *</label>
+            <input type="text" id="name" name="name" value="{{ ship.name }}" required>
+        </div>
+        
+        <div class="base-form-actions">
+            <button type="button" onclick="window.location.href='/navi'" class="base-btn-secondary">
+                Annulla
+            </button>
+            <button type="submit" class="base-btn-primary">
+                Aggiorna Nave
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

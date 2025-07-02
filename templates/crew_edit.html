@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="base-content-card">
+    <h2 class="base-content-title">Modifica Crew Member</h2>
+    <p class="base-content-description">Modifica i dati del membro dell'equipaggio</p>
+    
+    <form method="POST" x-data="crewEditForm({{ crew_member|tojson }})">
+        <div class="base-form-group">
+            <label for="name">Nome *</label>
+            <input type="text" id="name" name="name" x-model="formData.name" required>
+        </div>
+        
+        <div class="base-form-group">
+            <label for="ship">Nave</label>
+            <input type="text" 
+                   x-model="shipSearch" 
+                   @input.debounce.500ms="searchShips()"
+                   placeholder="Cerca nave...">
+            <select x-model="formData.ship_id" x-show="ships.length > 0" name="ship_id">
+                <option value="">Seleziona nave</option>
+                <template x-for="ship in ships" :key="ship.id">
+                    <option :value="ship.id" x-text="ship.name" :selected="ship.id == formData.ship_id"></option>
+                </template>
+            </select>
+        </div>
+        
+        <div class="base-form-group">
+            <label for="role">Ruolo</label>
+            <input type="text" 
+                   x-model="roleSearch" 
+                   @input.debounce.500ms="searchRoles()"
+                   placeholder="Cerca ruolo...">
+            <select x-model="formData.role_id" x-show="roles.length > 0" name="role_id">
+                <option value="">Seleziona ruolo</option>
+                <template x-for="role in roles" :key="role.id">
+                    <option :value="role.id" x-text="role.role_name" :selected="role.id == formData.role_id"></option>
+                </template>
+            </select>
+        </div>
+        
+        <div class="base-form-group">
+            <label for="tag">Tag (Opzionale)</label>
+            <input type="text" 
+                   x-model="tagSearch" 
+                   @input.debounce.500ms="searchTags()"
+                   placeholder="Cerca tag esatto...">
+            <select x-model="formData.tag_id" x-show="tags.length > 0" name="tag_id">
+                <option value="">Nessun tag</option>
+                <template x-for="tag in tags" :key="tag.id">
+                    <option :value="tag.id" x-text="tag.name" :selected="tag.id == formData.tag_id"></option>
+                </template>
+            </select>
+        </div>
+        
+        <div class="base-form-actions">
+            <button type="button" @click="window.location.href='/crew'" class="base-btn-secondary">
+                Annulla
+            </button>
+            <button type="submit" class="base-btn-primary">
+                Aggiorna Crew Member
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function crewEditForm(existingData) {
+    return {
+        formData: {
+            name: existingData.name || '',
+            ship_id: existingData.ship_id || '',
+            role_id: existingData.role_id || '',
+            tag_id: existingData.tag_id || ''
+        },
+        shipSearch: existingData.ship_name || '',
+        roleSearch: existingData.role_name || '',
+        tagSearch: existingData.tag_name || '',
+        ships: existingData.ship_name ? [{id: existingData.ship_id, name: existingData.ship_name}] : [],
+        roles: existingData.role_name ? [{id: existingData.role_id, role_name: existingData.role_name}] : [],
+        tags: existingData.tag_name ? [{id: existingData.tag_id, name: existingData.tag_name}] : [],
+        
+        // Same search methods as in crew_add.html
+        async searchShips() {
+            if (this.shipSearch.length < 2) {
+                this.ships = [];
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/ships/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: this.shipSearch })
+                });
+                
+                const data = await response.json();
+                this.ships = data.ships || [];
+            } catch (error) {
+                console.error('Ship search error:', error);
+            }
+        },
+        
+        async searchRoles() {
+            if (this.roleSearch.length < 2) {
+                this.roles = [];
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/roles/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: this.roleSearch })
+                });
+                
+                const data = await response.json();
+                this.roles = data.roles || [];
+            } catch (error) {
+                console.error('Role search error:', error);
+            }
+        },
+        
+        async searchTags() {
+            if (this.tagSearch.length < 2) {
+                this.tags = [];
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/tags/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: this.tagSearch })
+                });
+                
+                const data = await response.json();
+                this.tags = data.tags || [];
+            } catch (error) {
+                console.error('Tag search error:', error);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

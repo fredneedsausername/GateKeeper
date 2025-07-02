@@ -1,9 +1,10 @@
-from flask import Flask, request, session, redirect, render_template, jsonify
+from flask import Flask, request, session, redirect, render_template, jsonify, flash
 from waitress import serve
 from psycopg.rows import dict_row
 import os
 from psycopg_pool import ConnectionPool
 from functools import wraps
+from datetime import datetime, timedelta
 
 def auth_required(fn):
     @wraps(fn)
@@ -14,10 +15,10 @@ def auth_required(fn):
     return decorated
 
 def get_env(env_var: str):
-        ret = os.getenv(env_var)
-        if not ret:
-            raise Exception(f"{env_var} not found")
-        return ret
+    ret = os.getenv(env_var)
+    if not ret:
+        raise Exception(f"{env_var} not found")
+    return ret
 
 db_url = get_env("DATABASE_URL")
 db_pool = ConnectionPool(
@@ -47,8 +48,165 @@ def inject_global_vars():
     }
 
 secret_key = get_env("SECRET_KEY")
-
 app.secret_key = str(secret_key)
+
+# ===== UTILITY FUNCTIONS =====
+
+@connected_to_database
+def get_ships_for_dropdown(curs):
+    curs.execute("SELECT id, name FROM ship ORDER BY name")
+    ships = curs.fetchall()
+    return [{"value": ship["id"], "label": ship["name"]} for ship in ships]
+
+@connected_to_database
+def get_roles_for_dropdown(curs):
+    curs.execute("SELECT id, role_name FROM crew_member_roles ORDER BY role_name")
+    roles = curs.fetchall()
+    return [{"value": role["id"], "label": role["role_name"]} for role in roles]
+
+@connected_to_database
+def get_shipyards_for_dropdown(curs):
+    curs.execute("SELECT id, name FROM shipyard ORDER BY name")
+    shipyards = curs.fetchall()
+    return [{"value": sy["id"], "label": sy["name"]} for sy in shipyards]
+
+def get_total_count_with_filters(table_name, filters, curs):
+    """Get total count based on filters"""
+    if table_name == "crew_member":
+        query = """
+            SELECT COUNT(*) as count
+            FROM crew_member cm
+            LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
+            LEFT JOIN ship s ON cm.ship_id = s.id
+            WHERE 1=1
+        """
+        params = []
+        
+        if filters.get('crew_name'):
+            query += " AND LOWER(cm.name) LIKE LOWER(%s)"
+            params.append(f"%{filters['crew_name']}%")
+        
+        if filters.get('ship_name'):
+            query += " AND LOWER(s.name) LIKE LOWER(%s)"
+            params.append(f"%{filters['ship_name']}%")
+        
+        if filters.get('role_id'):
+            query += " AND cm.role_id = %s"
+            params.append(filters['role_id'])
+        
+        if filters.get('ship_id'):
+            query += " AND cm.ship_id = %s"
+            params.append(filters['ship_id'])
+        
+        curs.execute(query, params)
+        result = curs.fetchone()
+        return result['count'] if result else 0
+    
+    elif table_name == "ship":
+        query = "SELECT COUNT(*) as count FROM ship WHERE 1=1"
+        params = []
+        
+        if filters.get('ship_name'):
+            query += " AND LOWER(name) LIKE LOWER(%s)"
+            params.append(f"%{filters['ship_name']}%")
+        
+        curs.execute(query, params)
+        result = curs.fetchone()
+        return result['count'] if result else 0
+    
+    elif table_name == "tag":
+        query = """
+            SELECT COUNT(*) as count
+            FROM tag t
+            LEFT JOIN crew_member cm ON t.id = cm.tag_id
+            WHERE 1=1
+        """
+        params = []
+        
+        if filters.get('assigned') and not filters.get('vacant'):
+            query += " AND cm.id IS NOT NULL"
+        elif filters.get('vacant') and not filters.get('assigned'):
+            query += " AND cm.id IS NULL"
+        elif not filters.get('assigned') and not filters.get('vacant'):
+            query += " AND 1=0"
+        
+        curs.execute(query, params)
+        result = curs.fetchone()
+        return result['count'] if result else 0
+    
+    elif table_name == "unassigned_tag_entry":
+        query = """
+            SELECT COUNT(*) as count
+            FROM unassigned_tag_entry ute
+            JOIN tag t ON ute.tag_id = t.id
+            JOIN shipyard s ON ute.shipyard_id = s.id
+            WHERE 1=1
+        """
+        params = []
+        
+        if filters.get('start_timestamp'):
+            query += " AND ute.advertisement_timestamp >= %s"
+            params.append(filters['start_timestamp'])
+        
+        if filters.get('end_timestamp'):
+            query += " AND ute.advertisement_timestamp <= %s"
+            params.append(filters['end_timestamp'])
+        
+        if filters.get('shipyard_id'):
+            query += " AND ute.shipyard_id = %s"
+            params.append(filters['shipyard_id'])
+        
+        if filters.get('tag_name'):
+            query += " AND t.name = %s"
+            params.append(filters['tag_name'])
+        
+        curs.execute(query, params)
+        result = curs.fetchone()
+        return result['count'] if result else 0
+    
+    elif table_name == "permanence_log":
+        query = """
+            SELECT COUNT(*) as count
+            FROM permanence_log pl
+            JOIN crew_member cm ON pl.crew_member_id = cm.id
+            JOIN shipyard s ON pl.shipyard_id = s.id
+            LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
+            LEFT JOIN ship ship ON cm.ship_id = ship.id
+            WHERE 1=1
+        """
+        params = []
+        
+        if filters.get('start_timestamp') and filters.get('end_timestamp'):
+            query += """
+                AND (
+                    (pl.entry_timestamp <= %s AND (pl.leave_timestamp IS NULL OR pl.leave_timestamp >= %s))
+                    OR (pl.entry_timestamp >= %s AND pl.entry_timestamp <= %s)
+                )
+            """
+            params.extend([
+                filters['end_timestamp'], filters['start_timestamp'],
+                filters['start_timestamp'], filters['end_timestamp']
+            ])
+        
+        if filters.get('shipyard_id'):
+            query += " AND pl.shipyard_id = %s"
+            params.append(filters['shipyard_id'])
+        
+        if filters.get('ship_id'):
+            query += " AND cm.ship_id = %s"
+            params.append(filters['ship_id'])
+        
+        if filters.get('crew_name'):
+            query += " AND LOWER(cm.name) LIKE LOWER(%s)"
+            params.append(f"%{filters['crew_name']}%")
+        
+        curs.execute(query, params)
+        result = curs.fetchone()
+        return result['count'] if result else 0
+    
+    return 0
+
+# ===== MAIN ROUTES =====
 
 @app.route("/")
 @auth_required
@@ -57,7 +215,6 @@ def index():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
     if request.method == "GET":
         return render_template("login.html")
 
@@ -68,12 +225,7 @@ def login():
         
         @connected_to_database
         def fetch_username(curs):
-            curs.execute("""
-            SELECT username
-            FROM users
-            WHERE password=%s        
-            """, (password,))
-
+            curs.execute("SELECT username FROM users WHERE password=%s", (password,))
             return curs.fetchone()
 
         if fetch_username():
@@ -92,10 +244,930 @@ def logout():
     session.clear()
     return redirect("/login")
 
-# @app.route("/")
+# ===== CREW MEMBERS ROUTES =====
+
+@app.route('/crew')
+@auth_required
+def crew_page():
+    ships = get_ships_for_dropdown()
+    roles = get_roles_for_dropdown()
+    
+    table_config = {
+        "title": "Gestione Crew",
+        "description": "Visualizza e gestisci i membri dell'equipaggio",
+        "columns": [
+            {"key": "tag_name", "label": "Tag", "type": "text"},
+            {"key": "battery_level", "label": "🔋%", "type": "battery"},
+            {"key": "ship_name", "label": "Nave", "type": "text"},
+            {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
+            {"key": "role_name", "label": "Ruolo", "type": "text"}
+        ],
+        "textFilters": [
+            {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."},
+            {"key": "ship_name", "label": "Nome Nave", "placeholder": "Cerca per nave..."}
+        ],
+        "selectFilters": [
+            {"key": "role_id", "label": "Ruolo", "options": roles},
+            {"key": "ship_id", "label": "Nave", "options": ships}
+        ],
+        "allowAdd": True,
+        "allowEdit": True,
+        "allowDelete": True,
+        "addButtonText": "Aggiungi Crew",
+        "emptyMessage": "Applica dei filtri per visualizzare i membri dell'equipaggio.",
+        "apiEndpoint": "/api/crew/filter",
+        "addUrl": "/crew/add",
+        "editUrl": "/crew/edit/{id}",
+        "deleteUrl": "/api/crew/delete/{id}"
+    }
+    
+    return render_template('crew.html', table_config=table_config)
+
+@app.route('/api/crew/filter', methods=['POST'])
+@auth_required
+@connected_to_database
+def crew_filter(curs):
+    data = request.get_json()
+    filters = data.get('filters', {})
+    page = data.get('page', 1)
+    page_size = data.get('page_size', 50)
+    
+    query = """
+        SELECT 
+            cm.id,
+            cm.name as crew_member_name,
+            cr.role_name,
+            s.name as ship_name,
+            t.name as tag_name,
+            t.remaining_battery as battery_level
+        FROM crew_member cm
+        LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
+        LEFT JOIN ship s ON cm.ship_id = s.id
+        LEFT JOIN tag t ON cm.tag_id = t.id
+        WHERE 1=1
+    """
+    
+    params = []
+    
+    # Apply filters
+    if filters.get('crew_name'):
+        query += " AND LOWER(cm.name) LIKE LOWER(%s)"
+        params.append(f"%{filters['crew_name']}%")
+    
+    if filters.get('ship_name'):
+        query += " AND LOWER(s.name) LIKE LOWER(%s)"
+        params.append(f"%{filters['ship_name']}%")
+    
+    if filters.get('role_id'):
+        query += " AND cm.role_id = %s"
+        params.append(filters['role_id'])
+    
+    if filters.get('ship_id'):
+        query += " AND cm.ship_id = %s"
+        params.append(filters['ship_id'])
+    
+    # Add pagination
+    query += " ORDER BY cm.name LIMIT %s OFFSET %s"
+    params.extend([page_size, (page - 1) * page_size])
+    
+    curs.execute(query, params)
+    items = curs.fetchall()
+    total = get_total_count_with_filters("crew_member", filters, curs)
+    
+    return jsonify({
+        "items": items,
+        "total": total,
+        "has_more": len(items) == page_size
+    })
+
+@app.route('/crew/add', methods=['GET', 'POST'])
+@auth_required
+def add_crew():
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            ship_id = request.form.get('ship_id') or None
+            role_id = request.form.get('role_id') or None
+            tag_id = request.form.get('tag_id') or None
+            
+            if not name:
+                flash('Nome è obbligatorio', 'error')
+                return redirect(request.url)
+            
+            @connected_to_database
+            def insert_crew(curs):
+                curs.execute(
+                    "INSERT INTO crew_member (name, ship_id, role_id, tag_id) VALUES (%s, %s, %s, %s)",
+                    [name, ship_id, role_id, tag_id]
+                )
+            
+            insert_crew()
+            flash('Crew member aggiunto con successo', 'success')
+            return redirect('/crew')
+            
+        except Exception as e:
+            flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
+            return redirect(request.url)
+    
+    return render_template('crew_add.html')
+
+@app.route('/crew/edit/<int:crew_id>', methods=['GET', 'POST'])
+@auth_required
+def edit_crew(crew_id):
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            ship_id = request.form.get('ship_id') or None
+            role_id = request.form.get('role_id') or None
+            tag_id = request.form.get('tag_id') or None
+            
+            if not name:
+                flash('Nome è obbligatorio', 'error')
+                return redirect(request.url)
+            
+            @connected_to_database
+            def update_crew(curs):
+                curs.execute(
+                    "UPDATE crew_member SET name = %s, ship_id = %s, role_id = %s, tag_id = %s WHERE id = %s",
+                    [name, ship_id, role_id, tag_id, crew_id]
+                )
+            
+            update_crew()
+            flash('Crew member aggiornato con successo', 'success')
+            return redirect('/crew')
+            
+        except Exception as e:
+            flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
+            return redirect(request.url)
+    
+    @connected_to_database
+    def get_crew_member(curs):
+        curs.execute(
+            """SELECT cm.*, s.name as ship_name, cr.role_name, t.name as tag_name
+               FROM crew_member cm
+               LEFT JOIN ship s ON cm.ship_id = s.id
+               LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
+               LEFT JOIN tag t ON cm.tag_id = t.id
+               WHERE cm.id = %s""",
+            [crew_id]
+        )
+        return curs.fetchone()
+    
+    crew_member = get_crew_member()
+    
+    if not crew_member:
+        flash('Crew member non trovato', 'error')
+        return redirect('/crew')
+    
+    return render_template('crew_edit.html', crew_member=crew_member)
+
+@app.route('/api/crew/delete/<int:crew_id>', methods=['DELETE'])
+@auth_required
+@connected_to_database
+def delete_crew(curs, crew_id):
+    try:
+        curs.execute("DELETE FROM crew_member WHERE id = %s", [crew_id])
+        return jsonify({"success": True, "message": "Crew member eliminato con successo"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ===== SHIPS ROUTES =====
+
+@app.route('/navi')
+@auth_required
+def ships_page():
+    table_config = {
+        "title": "Gestione Navi",
+        "description": "Visualizza e gestisci le navi",
+        "columns": [
+            {"key": "name", "label": "Nave", "type": "text"}
+        ],
+        "textFilters": [
+            {"key": "ship_name", "label": "Nome Nave", "placeholder": "Cerca per nome..."}
+        ],
+        "allowAdd": True,
+        "allowEdit": True,
+        "allowDelete": True,
+        "addButtonText": "Aggiungi Nave",
+        "emptyMessage": "Applica dei filtri per visualizzare le navi.",
+        "apiEndpoint": "/api/ships/filter",
+        "addUrl": "/navi/add",
+        "editUrl": "/navi/edit/{id}",
+        "deleteUrl": "/api/ships/delete/{id}"
+    }
+    
+    return render_template('ships.html', table_config=table_config)
+
+@app.route('/api/ships/filter', methods=['POST'])
+@auth_required
+@connected_to_database
+def ships_filter(curs):
+    data = request.get_json()
+    filters = data.get('filters', {})
+    page = data.get('page', 1)
+    page_size = data.get('page_size', 50)
+    
+    query = "SELECT id, name FROM ship WHERE 1=1"
+    params = []
+    
+    if filters.get('ship_name'):
+        query += " AND LOWER(name) LIKE LOWER(%s)"
+        params.append(f"%{filters['ship_name']}%")
+    
+    query += " ORDER BY name LIMIT %s OFFSET %s"
+    params.extend([page_size, (page - 1) * page_size])
+    
+    curs.execute(query, params)
+    items = curs.fetchall()
+    total = get_total_count_with_filters("ship", filters, curs)
+    
+    return jsonify({
+        "items": items,
+        "total": total,
+        "has_more": len(items) == page_size
+    })
+
+@app.route('/navi/add', methods=['GET', 'POST'])
+@auth_required
+def add_ship():
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            
+            if not name:
+                flash('Nome è obbligatorio', 'error')
+                return redirect(request.url)
+            
+            @connected_to_database
+            def insert_ship(curs):
+                curs.execute("INSERT INTO ship (name) VALUES (%s)", [name])
+            
+            insert_ship()
+            flash('Nave aggiunta con successo', 'success')
+            return redirect('/navi')
+            
+        except Exception as e:
+            flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
+            return redirect(request.url)
+    
+    return render_template('ship_add.html')
+
+@app.route('/navi/edit/<int:ship_id>', methods=['GET', 'POST'])
+@auth_required
+def edit_ship(ship_id):
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            
+            if not name:
+                flash('Nome è obbligatorio', 'error')
+                return redirect(request.url)
+            
+            @connected_to_database
+            def update_ship(curs):
+                curs.execute("UPDATE ship SET name = %s WHERE id = %s", [name, ship_id])
+            
+            update_ship()
+            flash('Nave aggiornata con successo', 'success')
+            return redirect('/navi')
+            
+        except Exception as e:
+            flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
+            return redirect(request.url)
+    
+    @connected_to_database
+    def get_ship(curs):
+        curs.execute("SELECT * FROM ship WHERE id = %s", [ship_id])
+        return curs.fetchone()
+    
+    ship = get_ship()
+    
+    if not ship:
+        flash('Nave non trovata', 'error')
+        return redirect('/navi')
+    
+    return render_template('ship_edit.html', ship=ship)
+
+@app.route('/api/ships/delete/<int:ship_id>', methods=['DELETE'])
+@auth_required
+@connected_to_database
+def delete_ship(curs, ship_id):
+    try:
+        curs.execute("DELETE FROM ship WHERE id = %s", [ship_id])
+        return jsonify({"success": True, "message": "Nave eliminata con successo"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ===== TAGS ROUTES =====
+
+@app.route('/tag')
+@auth_required
+def tags_page():
+    table_config = {
+        "title": "Gestione Tag",
+        "description": "Visualizza e gestisci i tag",
+        "columns": [
+            {"key": "name", "label": "Tag", "type": "text"},
+            {"key": "remaining_battery", "label": "🔋%", "type": "battery"},
+            {"key": "crew_member_name", "label": "Equipaggio", "type": "text"}
+        ],
+        "checkboxFilters": [
+            {"key": "assigned", "label": "Assegnati"},
+            {"key": "vacant", "label": "Vacanti"}
+        ],
+        "allowAdd": True,
+        "allowEdit": True,
+        "allowDelete": True,
+        "addButtonText": "Aggiungi Tag",
+        "emptyMessage": "Seleziona almeno un filtro per visualizzare i tag.",
+        "apiEndpoint": "/api/tags/filter",
+        "addUrl": "/tag/add",
+        "editUrl": "/tag/edit/{id}",
+        "deleteUrl": "/api/tags/delete/{id}"
+    }
+    
+    return render_template('tags.html', table_config=table_config)
+
+@app.route('/api/tags/filter', methods=['POST'])
+@auth_required
+@connected_to_database
+def tags_filter(curs):
+    data = request.get_json()
+    filters = data.get('filters', {})
+    page = data.get('page', 1)
+    page_size = data.get('page_size', 50)
+    
+    query = """
+        SELECT 
+            t.id,
+            t.name,
+            t.remaining_battery,
+            cm.name as crew_member_name
+        FROM tag t
+        LEFT JOIN crew_member cm ON t.id = cm.tag_id
+        WHERE 1=1
+    """
+    
+    params = []
+    
+    # Apply checkbox filters
+    if filters.get('assigned') and not filters.get('vacant'):
+        query += " AND cm.id IS NOT NULL"
+    elif filters.get('vacant') and not filters.get('assigned'):
+        query += " AND cm.id IS NULL"
+    elif not filters.get('assigned') and not filters.get('vacant'):
+        # Default: show nothing if no checkbox is selected
+        query += " AND 1=0"
+    
+    # Order by battery level (lowest first)
+    query += " ORDER BY t.remaining_battery ASC LIMIT %s OFFSET %s"
+    params.extend([page_size, (page - 1) * page_size])
+    
+    curs.execute(query, params)
+    items = curs.fetchall()
+    total = get_total_count_with_filters("tag", filters, curs)
+    
+    return jsonify({
+        "items": items,
+        "total": total,
+        "has_more": len(items) == page_size
+    })
+
+@app.route('/tag/add', methods=['GET', 'POST'])
+@auth_required
+def add_tag():
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            crew_member_id = request.form.get('crew_member_id') or None
+            
+            if not name:
+                flash('Nome tag è obbligatorio', 'error')
+                return redirect(request.url)
+            
+            @connected_to_database
+            def insert_tag(curs):
+                # Insert tag
+                curs.execute("INSERT INTO tag (name, remaining_battery, packet_counter) VALUES (%s, %s, %s)", 
+                           [name, 100.0, 0])
+                
+                # Get the new tag ID
+                curs.execute("SELECT id FROM tag WHERE name = %s ORDER BY id DESC LIMIT 1", [name])
+                tag_id = curs.fetchone()['id']
+                
+                # If crew member selected, assign tag to them
+                if crew_member_id:
+                    curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", 
+                               [tag_id, crew_member_id])
+            
+            insert_tag()
+            flash('Tag aggiunto con successo', 'success')
+            return redirect('/tag')
+            
+        except Exception as e:
+            flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
+            return redirect(request.url)
+    
+    return render_template('tag_add.html')
+
+@app.route('/tag/edit/<int:tag_id>', methods=['GET', 'POST'])
+@auth_required
+def edit_tag(tag_id):
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name')
+            crew_member_id = request.form.get('crew_member_id') or None
+            
+            if not name:
+                flash('Nome tag è obbligatorio', 'error')
+                return redirect(request.url)
+            
+            @connected_to_database
+            def update_tag(curs):
+                # Update tag name
+                curs.execute("UPDATE tag SET name = %s WHERE id = %s", [name, tag_id])
+                
+                # Remove tag from current crew member
+                curs.execute("UPDATE crew_member SET tag_id = NULL WHERE tag_id = %s", [tag_id])
+                
+                # Assign to new crew member if selected
+                if crew_member_id:
+                    curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", 
+                               [tag_id, crew_member_id])
+            
+            update_tag()
+            flash('Tag aggiornato con successo', 'success')
+            return redirect('/tag')
+            
+        except Exception as e:
+            flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
+            return redirect(request.url)
+    
+    @connected_to_database
+    def get_tag(curs):
+        curs.execute(
+            """SELECT t.*, cm.name as crew_member_name, cm.id as crew_member_id
+               FROM tag t
+               LEFT JOIN crew_member cm ON t.id = cm.tag_id
+               WHERE t.id = %s""",
+            [tag_id]
+        )
+        return curs.fetchone()
+    
+    tag = get_tag()
+    
+    if not tag:
+        flash('Tag non trovato', 'error')
+        return redirect('/tag')
+    
+    return render_template('tag_edit.html', tag=tag)
+
+@app.route('/api/tags/delete/<int:tag_id>', methods=['DELETE'])
+@auth_required
+@connected_to_database
+def delete_tag(curs, tag_id):
+    try:
+        curs.execute("DELETE FROM tag WHERE id = %s", [tag_id])
+        return jsonify({"success": True, "message": "Tag eliminato con successo"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ===== ENTRIES ROUTES =====
+
+@app.route('/entry')
+@auth_required
+def entries_page():
+    # Default to last 24 hours
+    now = datetime.now()
+    yesterday = now - timedelta(hours=24)
+    
+    shipyards = get_shipyards_for_dropdown()
+    
+    table_config = {
+        "title": "Log Entrate",
+        "description": "Visualizza le entrate di tag non assegnati",
+        "columns": [
+            {"key": "shipyard_name", "label": "Cantiere", "type": "text"},
+            {"key": "tag_name", "label": "Tag", "type": "text"},
+            {"key": "battery_level", "label": "🔋%", "type": "battery"},
+            {"key": "advertisement_timestamp", "label": "Passaggio", "type": "datetime"},
+            {"key": "entry_type", "label": "Tipologia", "type": "text"}
+        ],
+        "dateFilters": [
+            {
+                "key": "start_timestamp", 
+                "label": "Data Inizio",
+                "defaultValue": yesterday.strftime('%Y-%m-%dT%H:%M')
+            },
+            {
+                "key": "end_timestamp", 
+                "label": "Data Fine",
+                "defaultValue": now.strftime('%Y-%m-%dT%H:%M')
+            }
+        ],
+        "selectFilters": [
+            {"key": "shipyard_id", "label": "Cantiere", "options": shipyards}
+        ],
+        "textFilters": [
+            {"key": "tag_name", "label": "Nome Tag", "placeholder": "Cerca tag esatto..."}
+        ],
+        "allowAdd": False,
+        "allowEdit": False,
+        "allowDelete": True,
+        "emptyMessage": "Nessuna entrata trovata nel periodo selezionato.",
+        "apiEndpoint": "/api/entries/filter",
+        "deleteUrl": "/api/entries/delete/{id}"
+    }
+    
+    return render_template('entries.html', table_config=table_config)
+
+@app.route('/api/entries/filter', methods=['POST'])
+@auth_required
+@connected_to_database
+def entries_filter(curs):
+    data = request.get_json()
+    filters = data.get('filters', {})
+    page = data.get('page', 1)
+    page_size = data.get('page_size', 50)
+    
+    query = """
+        SELECT 
+            ute.id,
+            s.name as shipyard_name,
+            t.name as tag_name,
+            t.remaining_battery as battery_level,
+            ute.advertisement_timestamp,
+            CASE WHEN ute.is_entering THEN 'Ingresso' ELSE 'Uscita' END as entry_type
+        FROM unassigned_tag_entry ute
+        JOIN tag t ON ute.tag_id = t.id
+        JOIN shipyard s ON ute.shipyard_id = s.id
+        WHERE 1=1
+    """
+    
+    params = []
+    
+    # Apply date filters
+    if filters.get('start_timestamp'):
+        query += " AND ute.advertisement_timestamp >= %s"
+        params.append(filters['start_timestamp'])
+    
+    if filters.get('end_timestamp'):
+        query += " AND ute.advertisement_timestamp <= %s"
+        params.append(filters['end_timestamp'])
+    
+    if filters.get('shipyard_id'):
+        query += " AND ute.shipyard_id = %s"
+        params.append(filters['shipyard_id'])
+    
+    if filters.get('tag_name'):
+        query += " AND t.name = %s"
+        params.append(filters['tag_name'])
+    
+    # Order by battery level
+    query += " ORDER BY t.remaining_battery ASC LIMIT %s OFFSET %s"
+    params.extend([page_size, (page - 1) * page_size])
+    
+    curs.execute(query, params)
+    items = curs.fetchall()
+    total = get_total_count_with_filters("unassigned_tag_entry", filters, curs)
+    
+    return jsonify({
+        "items": items,
+        "total": total,
+        "has_more": len(items) == page_size
+    })
+
+@app.route('/api/entries/delete/<int:entry_id>', methods=['DELETE'])
+@auth_required
+@connected_to_database
+def delete_entry(curs, entry_id):
+    try:
+        curs.execute("DELETE FROM unassigned_tag_entry WHERE id = %s", [entry_id])
+        return jsonify({"success": True, "message": "Entry eliminata con successo"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ===== LOGS ROUTES =====
+
+@app.route('/log')
+@auth_required
+def logs_page():
+    # Default to last 24 hours
+    now = datetime.now()
+    yesterday = now - timedelta(hours=24)
+    
+    shipyards = get_shipyards_for_dropdown()
+    ships = get_ships_for_dropdown()
+    
+    table_config = {
+        "title": "Log Permanenze",
+        "description": "Visualizza i log di permanenza nei cantieri",
+        "columns": [
+            {"key": "shipyard_name", "label": "Cantiere", "type": "text"},
+            {"key": "current_tag_name", "label": "Tag", "type": "text"},
+            {"key": "current_battery_level", "label": "🔋%", "type": "battery"},
+            {"key": "ship_name", "label": "Nave", "type": "text"},
+            {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
+            {"key": "role_name", "label": "Ruolo", "type": "text"},
+            {"key": "entry_timestamp", "label": "Entrata", "type": "datetime"},
+            {"key": "leave_timestamp", "label": "Uscita", "type": "datetime"}
+        ],
+        "dateFilters": [
+            {
+                "key": "start_timestamp", 
+                "label": "Data Inizio",
+                "defaultValue": yesterday.strftime('%Y-%m-%dT%H:%M')
+            },
+            {
+                "key": "end_timestamp", 
+                "label": "Data Fine",
+                "defaultValue": now.strftime('%Y-%m-%dT%H:%M')
+            }
+        ],
+        "selectFilters": [
+            {"key": "shipyard_id", "label": "Cantiere", "options": shipyards},
+            {"key": "ship_id", "label": "Nave", "options": ships}
+        ],
+        "textFilters": [
+            {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
+        ],
+        "allowAdd": True,
+        "allowEdit": True,
+        "allowDelete": True,
+        "addButtonText": "Aggiungi Log",
+        "emptyMessage": "Nessun log trovato nel periodo selezionato.",
+        "apiEndpoint": "/api/logs/filter",
+        "addUrl": "/log/add",
+        "editUrl": "/log/edit/{id}",
+        "deleteUrl": "/api/logs/delete/{id}"
+    }
+    
+    return render_template('logs.html', table_config=table_config)
+
+@app.route('/api/logs/filter', methods=['POST'])
+@auth_required
+@connected_to_database
+def logs_filter(curs):
+    data = request.get_json()
+    filters = data.get('filters', {})
+    page = data.get('page', 1)
+    page_size = data.get('page_size', 50)
+    
+    query = """
+        SELECT 
+            pl.id,
+            s.name as shipyard_name,
+            current_tag.name as current_tag_name,
+            current_tag.remaining_battery as current_battery_level,
+            ship.name as ship_name,
+            cm.name as crew_member_name,
+            cr.role_name,
+            pl.entry_timestamp,
+            pl.leave_timestamp
+        FROM permanence_log pl
+        JOIN crew_member cm ON pl.crew_member_id = cm.id
+        JOIN shipyard s ON pl.shipyard_id = s.id
+        LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
+        LEFT JOIN ship ship ON cm.ship_id = ship.id
+        LEFT JOIN tag current_tag ON cm.tag_id = current_tag.id
+        WHERE 1=1
+    """
+    
+    params = []
+    
+    # Apply overlap filter for time period
+    if filters.get('start_timestamp') and filters.get('end_timestamp'):
+        query += """
+            AND (
+                (pl.entry_timestamp <= %s AND (pl.leave_timestamp IS NULL OR pl.leave_timestamp >= %s))
+                OR (pl.entry_timestamp >= %s AND pl.entry_timestamp <= %s)
+            )
+        """
+        params.extend([
+            filters['end_timestamp'], filters['start_timestamp'],
+            filters['start_timestamp'], filters['end_timestamp']
+        ])
+    
+    if filters.get('shipyard_id'):
+        query += " AND pl.shipyard_id = %s"
+        params.append(filters['shipyard_id'])
+    
+    if filters.get('ship_id'):
+        query += " AND cm.ship_id = %s"
+        params.append(filters['ship_id'])
+    
+    if filters.get('crew_name'):
+        query += " AND LOWER(cm.name) LIKE LOWER(%s)"
+        params.append(f"%{filters['crew_name']}%")
+    
+    # Order by crew member name
+    query += " ORDER BY cm.name ASC LIMIT %s OFFSET %s"
+    params.extend([page_size, (page - 1) * page_size])
+    
+    curs.execute(query, params)
+    items = curs.fetchall()
+    total = get_total_count_with_filters("permanence_log", filters, curs)
+    
+    return jsonify({
+        "items": items,
+        "total": total,
+        "has_more": len(items) == page_size
+    })
+
+@app.route('/log/add', methods=['GET', 'POST'])
+@auth_required
+def add_log():
+    if request.method == 'POST':
+        try:
+            crew_member_id = request.form.get('crew_member_id')
+            shipyard_id = request.form.get('shipyard_id')
+            entry_timestamp = request.form.get('entry_timestamp') or None
+            leave_timestamp = request.form.get('leave_timestamp') or None
+            
+            if not crew_member_id or not shipyard_id:
+                flash('Crew member e cantiere sono obbligatori', 'error')
+                return redirect(request.url)
+            
+            if not entry_timestamp and not leave_timestamp:
+                flash('Almeno una data (entrata o uscita) è obbligatoria', 'error')
+                return redirect(request.url)
+            
+            @connected_to_database
+            def insert_log(curs):
+                curs.execute(
+                    "INSERT INTO permanence_log (crew_member_id, shipyard_id, entry_timestamp, leave_timestamp) VALUES (%s, %s, %s, %s)",
+                    [crew_member_id, shipyard_id, entry_timestamp, leave_timestamp]
+                )
+            
+            insert_log()
+            flash('Log aggiunto con successo', 'success')
+            return redirect('/log')
+            
+        except Exception as e:
+            flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
+            return redirect(request.url)
+    
+    return render_template('log_add.html')
+
+@app.route('/log/edit/<int:log_id>', methods=['GET', 'POST'])
+@auth_required
+def edit_log(log_id):
+    if request.method == 'POST':
+        try:
+            crew_member_id = request.form.get('crew_member_id')
+            entry_timestamp = request.form.get('entry_timestamp') or None
+            leave_timestamp = request.form.get('leave_timestamp') or None
+            
+            if not crew_member_id:
+                flash('Crew member è obbligatorio', 'error')
+                return redirect(request.url)
+            
+            if not entry_timestamp and not leave_timestamp:
+                flash('Almeno una data (entrata o uscita) è obbligatoria', 'error')
+                return redirect(request.url)
+            
+            @connected_to_database
+            def update_log(curs):
+                curs.execute(
+                    "UPDATE permanence_log SET crew_member_id = %s, entry_timestamp = %s, leave_timestamp = %s WHERE id = %s",
+                    [crew_member_id, entry_timestamp, leave_timestamp, log_id]
+                )
+            
+            update_log()
+            flash('Log aggiornato con successo', 'success')
+            return redirect('/log')
+            
+        except Exception as e:
+            flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
+            return redirect(request.url)
+    
+    @connected_to_database
+    def get_log(curs):
+        curs.execute(
+            """SELECT pl.*, cm.name as crew_member_name, s.name as shipyard_name
+               FROM permanence_log pl
+               JOIN crew_member cm ON pl.crew_member_id = cm.id
+               JOIN shipyard s ON pl.shipyard_id = s.id
+               WHERE pl.id = %s""",
+            [log_id]
+        )
+        return curs.fetchone()
+    
+    log = get_log()
+    
+    if not log:
+        flash('Log non trovato', 'error')
+        return redirect('/log')
+    
+    return render_template('log_edit.html', log=log)
+
+@app.route('/api/logs/delete/<int:log_id>', methods=['DELETE'])
+@auth_required
+@connected_to_database
+def delete_log(curs, log_id):
+    try:
+        curs.execute("DELETE FROM permanence_log WHERE id = %s", [log_id])
+        return jsonify({"success": True, "message": "Log eliminato con successo"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ===== SEARCH ENDPOINTS =====
+
+@app.route('/api/ships/search', methods=['POST'])
+@auth_required
+@connected_to_database
+def search_ships(curs):
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if len(query) < 2:
+        return jsonify({"ships": []})
+    
+    curs.execute(
+        "SELECT id, name FROM ship WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
+        [f"%{query}%"]
+    )
+    ships = curs.fetchall()
+    
+    return jsonify({"ships": ships})
+
+@app.route('/api/roles/search', methods=['POST'])
+@auth_required
+@connected_to_database
+def search_roles(curs):
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if len(query) < 2:
+        return jsonify({"roles": []})
+    
+    curs.execute(
+        "SELECT id, role_name FROM crew_member_roles WHERE LOWER(role_name) LIKE LOWER(%s) ORDER BY role_name LIMIT 10",
+        [f"%{query}%"]
+    )
+    roles = curs.fetchall()
+    
+    return jsonify({"roles": roles})
+
+@app.route('/api/tags/search', methods=['POST'])
+@auth_required
+@connected_to_database
+def search_tags(curs):
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if len(query) < 2:
+        return jsonify({"tags": []})
+    
+    curs.execute(
+        """SELECT t.id, t.name 
+           FROM tag t 
+           LEFT JOIN crew_member cm ON t.id = cm.tag_id 
+           WHERE t.name = %s AND cm.id IS NULL 
+           ORDER BY t.name LIMIT 10""",
+        [query]
+    )
+    tags = curs.fetchall()
+    
+    return jsonify({"tags": tags})
+
+@app.route('/api/crew/search', methods=['POST'])
+@auth_required
+@connected_to_database
+def search_crew(curs):
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if len(query) < 2:
+        return jsonify({"crew_members": []})
+    
+    curs.execute(
+        "SELECT id, name FROM crew_member WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
+        [f"%{query}%"]
+    )
+    crew_members = curs.fetchall()
+    
+    return jsonify({"crew_members": crew_members})
+
+@app.route('/api/shipyards/search', methods=['POST'])
+@auth_required
+@connected_to_database
+def search_shipyards(curs):
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if len(query) < 2:
+        return jsonify({"shipyards": []})
+    
+    curs.execute(
+        "SELECT id, name FROM shipyard WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
+        [f"%{query}%"]
+    )
+    shipyards = curs.fetchall()
+    
+    return jsonify({"shipyards": shipyards})
 
 if __name__ == "__main__":
-    
     flask_env = get_env("FLASK_ENV")
     flask_port = get_env("FLASK_PORT")
 
@@ -106,6 +1178,9 @@ if __name__ == "__main__":
             except SystemExit:
                 db_pool.close(timeout=0)
         case "production":
-            serve(app, port=flask_port, host="0.0.0.0")
+            try:
+                serve(app, port=flask_port, host="0.0.0.0")
+            except SystemExit:
+                db_pool.close(timeout=0)
         case _:
             raise Exception(f"{flask_env} must be either \"development\" or \"production\"")
