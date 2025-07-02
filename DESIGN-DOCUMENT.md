@@ -19,7 +19,7 @@ It's important to choose the right stack for the job. This robust combination en
 ### Frontend
 - **Structure:** Multi Page Application
 - **Reactivity:** Alpine.js 
-- **Styling:** Tailwind
+- **Styling:** CSS
 
 ### Backend
 - **Language:** Python
