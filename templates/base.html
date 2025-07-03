@@ -159,6 +159,10 @@
             transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
+        .base-sidebar.no-transition {
+            transition: none;
+        }
+        
         .base-sidebar-collapsed {
             width: 80px;
             padding-right: 16px;
@@ -761,8 +765,37 @@
             }
         }
     </style>
+    <script>
+        // Apply initial sidebar state immediately to prevent flash
+        (function() {
+            const isCollapsed = localStorage.getItem('sidebarOpen') === 'false';
+            if (isCollapsed) {
+                document.documentElement.classList.add('sidebar-initially-collapsed');
+            }
+        })();
+    </script>
+    <style>
+        /* Apply initial collapsed state before Alpine.js loads */
+        .sidebar-initially-collapsed .base-sidebar {
+            width: 80px;
+            padding-right: 16px;
+            transition: none;
+        }
+        
+        .sidebar-initially-collapsed .base-nav-item-text {
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+        
+        .sidebar-initially-collapsed .base-nav-item {
+            justify-content: flex-start;
+            padding: 12px;
+            width: 100%;
+            min-width: 44px;
+        }
+    </style>
 </head>
-<body x-data="{ baseSidebarOpen: true, baseDropdownOpen: false }" @click.away="baseDropdownOpen = false">
+<body x-data="sidebarState()" @click.away="baseDropdownOpen = false">
     <!-- Header -->
     <header class="base-header">
         <div class="base-header-content">
@@ -809,7 +842,7 @@
         <nav class="base-sidebar" :class="baseSidebarOpen ? '' : 'base-sidebar-collapsed'">
             <div class="base-sidebar-content">
                 <!-- Hamburger Menu Toggle -->
-                <button @click="baseSidebarOpen = !baseSidebarOpen" class="base-nav-item">
+                <button @click="toggleSidebar()" class="base-nav-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="3" y1="6" x2="21" y2="6"></line>
                         <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -875,5 +908,28 @@
     </div>
 
     {% block scripts %}{% endblock %}
+    
+    <script>
+        function sidebarState() {
+            return {
+                baseSidebarOpen: localStorage.getItem('sidebarOpen') !== 'false',
+                baseDropdownOpen: false,
+                
+                init() {
+                    // Clean up initial state class and enable transitions
+                    document.documentElement.classList.remove('sidebar-initially-collapsed');
+                    
+                    // Watch for changes to baseSidebarOpen and save to localStorage
+                    this.$watch('baseSidebarOpen', (value) => {
+                        localStorage.setItem('sidebarOpen', value.toString());
+                    });
+                },
+                
+                toggleSidebar() {
+                    this.baseSidebarOpen = !this.baseSidebarOpen;
+                }
+            }
+        }
+    </script>
 </body>
 </html>

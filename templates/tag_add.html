@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="base-content-card">
+    <h2 class="base-content-title">Aggiungi Tag</h2>
+    <p class="base-content-description">Inserisci i dati del nuovo tag</p>
+    
+    <form method="POST" x-data="tagForm()">
+        <div class="base-form-group">
+            <label for="name">Nome Tag *</label>
+            <input type="text" id="name" name="name" x-model="formData.name" required>
+        </div>
+        
+        <div class="base-form-group">
+            <label for="crew_member">Assegna a Equipaggio (Opzionale)</label>
+            <input type="text" 
+                   x-model="crewSearch" 
+                   @input.debounce.500ms="searchCrewMembers()"
+                   placeholder="Cerca membro equipaggio...">
+            <select x-model="formData.crew_member_id" x-show="crewMembers.length > 0" name="crew_member_id">
+                <option value="">Nessun membro equipaggio</option>
+                <template x-for="member in crewMembers" :key="member.id">
+                    <option :value="member.id" x-text="member.name"></option>
+                </template>
+            </select>
+        </div>
+        
+        <div class="base-form-actions">
+            <button type="button" @click="window.location.href='/tag'" class="base-btn-secondary">
+                Annulla
+            </button>
+            <button type="submit" class="base-btn-primary">
+                Crea Tag
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function tagForm() {
+    return {
+        formData: {
+            name: '',
+            crew_member_id: ''
+        },
+        crewSearch: '',
+        crewMembers: [],
+        
+        async searchCrewMembers() {
+            if (this.crewSearch.length < 2) {
+                this.crewMembers = [];
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/crew/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: this.crewSearch })
+                });
+                
+                const data = await response.json();
+                this.crewMembers = data.crew_members || [];
+            } catch (error) {
+                console.error('Crew search error:', error);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

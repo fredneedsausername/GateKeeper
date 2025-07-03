@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="base-content-card">
+    <h2 class="base-content-title">Modifica Log</h2>
+    <p class="base-content-description">Modifica i dati del log di permanenza</p>
+    
+    <form method="POST" x-data="logEditForm({{ log|tojson }})">
+        <div class="base-form-group">
+            <label>Cantiere</label>
+            <input type="text" :value="log.shipyard_name" disabled style="background-color: #f3f4f6; cursor: not-allowed;">
+            <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">Il cantiere non può essere modificato</p>
+        </div>
+        
+        <div class="base-form-group">
+            <label for="crew_member">Equipaggio *</label>
+            <input type="text" 
+                   x-model="crewSearch" 
+                   @input.debounce.500ms="searchCrewMembers()"
+                   placeholder="Cerca membro equipaggio...">
+            <select x-model="formData.crew_member_id" x-show="crewMembers.length > 0" name="crew_member_id" required>
+                <option value="">Seleziona membro equipaggio</option>
+                <template x-for="member in crewMembers" :key="member.id">
+                    <option :value="member.id" x-text="member.name" :selected="member.id == formData.crew_member_id"></option>
+                </template>
+            </select>
+        </div>
+        
+        <div class="base-form-group">
+            <label for="entry_timestamp">Data/Ora Entrata</label>
+            <input type="datetime-local" 
+                   id="entry_timestamp" 
+                   name="entry_timestamp" 
+                   x-model="formData.entry_timestamp"
+                   @change="validateTimestamps()">
+            <p x-show="!hasValidTimestamps" class="error-message" style="color: #dc2626; font-size: 14px; margin-top: 4px;">
+                Almeno una data (entrata o uscita) è obbligatoria
+            </p>
+        </div>
+        
+        <div class="base-form-group">
+            <label for="leave_timestamp">Data/Ora Uscita</label>
+            <input type="datetime-local" 
+                   id="leave_timestamp" 
+                   name="leave_timestamp" 
+                   x-model="formData.leave_timestamp"
+                   @change="validateTimestamps()">
+        </div>
+        
+        <div class="base-form-actions">
+            <button type="button" @click="window.location.href='/log'" class="base-btn-secondary">
+                Annulla
+            </button>
+            <button type="submit" 
+                    class="base-btn-primary"
+                    :disabled="!isFormValid"
+                    :style="!isFormValid ? 'opacity: 0.5; cursor: not-allowed;' : ''">
+                Aggiorna Log
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function logEditForm(existingData) {
+    return {
+        log: existingData,
+        formData: {
+            crew_member_id: existingData.crew_member_id || '',
+            entry_timestamp: existingData.entry_timestamp ? formatDateTimeForInput(existingData.entry_timestamp) : '',
+            leave_timestamp: existingData.leave_timestamp ? formatDateTimeForInput(existingData.leave_timestamp) : ''
+        },
+        crewSearch: existingData.crew_member_name || '',
+        crewMembers: existingData.crew_member_name ? [{id: existingData.crew_member_id, name: existingData.crew_member_name}] : [],
+        hasValidTimestamps: true,
+        
+        get isFormValid() {
+            return this.formData.crew_member_id && 
+                   (this.formData.entry_timestamp || this.formData.leave_timestamp);
+        },
+        
+        validateTimestamps() {
+            this.hasValidTimestamps = !!(this.formData.entry_timestamp || this.formData.leave_timestamp);
+        },
+        
+        async searchCrewMembers() {
+            if (this.crewSearch.length < 2) {
+                this.crewMembers = [];
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/crew/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: this.crewSearch })
+                });
+                
+                const data = await response.json();
+                this.crewMembers = data.crew_members || [];
+            } catch (error) {
+                console.error('Crew search error:', error);
+            }
+        }
+    }
+}
+
+// Helper function to format datetime for input
+function formatDateTimeForInput(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    
+    // Format as YYYY-MM-DDTHH:mm for datetime-local input
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+</script>
+{% endblock %}

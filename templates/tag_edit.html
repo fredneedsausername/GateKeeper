@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="base-content-card">
+    <h2 class="base-content-title">Modifica Tag</h2>
+    <p class="base-content-description">Modifica i dati del tag</p>
+    
+    <form method="POST" x-data="tagEditForm({{ tag|tojson }})">
+        <div class="base-form-group">
+            <label for="name">Nome Tag *</label>
+            <input type="text" id="name" name="name" x-model="formData.name" required>
+        </div>
+        
+        <div class="base-form-group">
+            <label for="crew_member">Riassegna a Equipaggio</label>
+            <input type="text" 
+                   x-model="crewSearch" 
+                   @input.debounce.500ms="searchCrewMembers()"
+                   placeholder="Cerca membro equipaggio...">
+            <select x-model="formData.crew_member_id" x-show="crewMembers.length > 0" name="crew_member_id">
+                <option value="">Nessun membro equipaggio</option>
+                <template x-for="member in crewMembers" :key="member.id">
+                    <option :value="member.id" x-text="member.name" :selected="member.id == formData.crew_member_id"></option>
+                </template>
+            </select>
+        </div>
+        
+        <div class="base-form-actions">
+            <button type="button" @click="window.location.href='/tag'" class="base-btn-secondary">
+                Annulla
+            </button>
+            <button type="submit" class="base-btn-primary">
+                Aggiorna Tag
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function tagEditForm(existingData) {
+    return {
+        formData: {
+            name: existingData.name || '',
+            crew_member_id: existingData.crew_member_id || ''
+        },
+        crewSearch: existingData.crew_member_name || '',
+        crewMembers: existingData.crew_member_name ? [{id: existingData.crew_member_id, name: existingData.crew_member_name}] : [],
+        
+        async searchCrewMembers() {
+            if (this.crewSearch.length < 2) {
+                this.crewMembers = [];
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/crew/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: this.crewSearch })
+                });
+                
+                const data = await response.json();
+                this.crewMembers = data.crew_members || [];
+            } catch (error) {
+                console.error('Crew search error:', error);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}
