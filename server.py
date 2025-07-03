@@ -5,6 +5,7 @@ import os
 from psycopg_pool import ConnectionPool
 from functools import wraps
 from datetime import datetime, timedelta
+import base64
 
 def auth_required(fn):
     @wraps(fn)
@@ -40,6 +41,14 @@ def connected_to_database(fn):
     return wrapped_function
 
 app = Flask(__name__)
+
+@app.template_filter('b64encode')
+def b64encode_filter(data):
+    """Base64 encode filter for Jinja2"""
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    return base64.b64encode(data).decode('ascii')
+
 
 @app.context_processor
 def inject_global_vars():

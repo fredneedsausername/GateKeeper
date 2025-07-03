@@ -1,4 +1,4 @@
-<div class="base-table-container" x-data="gateKeeperTable({{ table_config|tojson }})">
+<div class="base-table-container" x-data="gateKeeperTable('{{table_config|tojson|b64encode }}')">
     <!-- Table Header -->
     <div class="base-table-header">
         <h2 class="base-table-title" x-text="config.title"></h2>
@@ -203,7 +203,7 @@
 function gateKeeperTable(initialConfig) {
     return {
         // Configuration
-        config: initialConfig,
+        config: JSON.parse(atob(initialConfig)),
 
         // Data
         data: [],
