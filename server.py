@@ -211,7 +211,7 @@ def get_total_count_with_filters(table_name, filters, curs):
 @app.route("/")
 @auth_required
 def index():
-    return render_template("index.html")
+    return redirect("/log")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -1173,14 +1173,12 @@ if __name__ == "__main__":
 
     match flask_env:
         case "development":
-            try:
-                app.run(debug=True, port=flask_port, host="127.0.0.1")
-            except SystemExit:
-                db_pool.close(timeout=0)
+            while True:
+                try:
+                    app.run(debug=True, port=flask_port, host="127.0.0.1")
+                except SystemExit:
+                    db_pool.close(timeout=0)
         case "production":
-            try:
-                serve(app, port=flask_port, host="0.0.0.0")
-            except SystemExit:
-                db_pool.close(timeout=0)
+            serve(app, port=flask_port, host="0.0.0.0")
         case _:
             raise Exception(f"{flask_env} must be either \"development\" or \"production\"")
