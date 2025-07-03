@@ -1,192 +1,207 @@
-<div class="base-table-container" x-data="gateKeeperTable('{{table_config|tojson|b64encode }}')">
+<div class="base-table-container" x-data="gateKeeperTable()">
     <!-- Table Header -->
     <div class="base-table-header">
-        <h2 class="base-table-title" x-text="config.title"></h2>
-        <p class="base-table-description" x-text="config.description"></p>
+        <h2 class="base-table-title">{{ table_config.title }}</h2>
+        <p class="base-table-description">{{ table_config.description }}</p>
         
         <!-- Filters Section -->
-        <div class="base-filters-section" x-show="hasFilters">
-            <!-- Text Filters -->
-            <template x-for="filter in config.textFilters" :key="filter.key">
+        {% if table_config.text_filters or table_config.select_filters or table_config.date_filters or table_config.checkbox_filters %}
+        <form method="GET" action="{{ request.path }}">
+            <div class="base-filters-section">
+                <!-- Text Filters -->
+                {% for filter in table_config.text_filters %}
                 <div class="base-filter-group">
-                    <label class="base-filter-label" x-text="filter.label"></label>
+                    <label class="base-filter-label">{{ filter.label }}</label>
                     <input 
                         type="text" 
+                        name="{{ filter.key }}"
                         class="base-filter-input"
-                        :placeholder="filter.placeholder"
-                        x-model="filters[filter.key]"
-                        @input.debounce.500ms="applyFilters()"
+                        placeholder="{{ filter.placeholder }}"
+                        value="{{ request.args.get(filter.key, '') }}"
                     >
                 </div>
-            </template>
+                {% endfor %}
 
-            <!-- Select Filters -->
-            <template x-for="filter in config.selectFilters" :key="filter.key">
+                <!-- Select Filters -->
+                {% for filter in table_config.select_filters %}
                 <div class="base-filter-group">
-                    <label class="base-filter-label" x-text="filter.label"></label>
+                    <label class="base-filter-label">{{ filter.label }}</label>
                     <select 
+                        name="{{ filter.key }}"
                         class="base-filter-select"
-                        x-model="filters[filter.key]"
-                        @change="applyFilters()"
                     >
                         <option value="">Tutti</option>
-                        <template x-for="option in filter.options" :key="option.value">
-                            <option :value="option.value" x-text="option.label"></option>
-                        </template>
+                        {% for option in filter.options %}
+                        <option value="{{ option.value }}" {% if request.args.get(filter.key) == option.value|string %}selected{% endif %}>{{ option.label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
-            </template>
+                {% endfor %}
 
-            <!-- Date Filters -->
-            <template x-for="filter in config.dateFilters" :key="filter.key">
+                <!-- Date Filters -->
+                {% for filter in table_config.date_filters %}
                 <div class="base-filter-group">
-                    <label class="base-filter-label" x-text="filter.label"></label>
+                    <label class="base-filter-label">{{ filter.label }}</label>
                     <input 
                         type="datetime-local" 
+                        name="{{ filter.key }}"
                         class="base-filter-input base-datetime-input"
-                        x-model="filters[filter.key]"
-                        @change="applyFilters()"
+                        value="{{ request.args.get(filter.key, filter.default_value) }}"
                     >
                 </div>
-            </template>
+                {% endfor %}
 
-            <!-- Checkbox Filters -->
-            <div class="base-checkbox-filters" x-show="config.checkboxFilters && config.checkboxFilters.length > 0">
-                <template x-for="filter in config.checkboxFilters" :key="filter.key">
+                <!-- Checkbox Filters -->
+                {% if table_config.checkbox_filters %}
+                <div class="base-checkbox-filters">
+                    {% for filter in table_config.checkbox_filters %}
                     <div class="base-checkbox-group">
                         <input 
                             type="checkbox" 
+                            name="{{ filter.key }}"
+                            value="1"
                             class="base-checkbox"
-                            :id="filter.key"
-                            x-model="filters[filter.key]"
-                            @change="applyFilters()"
+                            id="{{ filter.key }}"
+                            {% if request.args.get(filter.key) %}checked{% endif %}
                         >
-                        <label :for="filter.key" class="base-filter-label" x-text="filter.label"></label>
+                        <label for="{{ filter.key }}" class="base-filter-label">{{ filter.label }}</label>
                     </div>
-                </template>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
-        </div>
 
-        <!-- Actions Bar -->
-        <div class="base-actions-bar">
-            <button 
-                class="base-filter-reset" 
-                @click="resetFilters()"
-                x-show="hasActiveFilters"
-            >
-                Cancella Filtri
-            </button>
-            <div></div>
-            <button 
-                class="base-add-button" 
-                @click="handleAdd()"
-                x-show="config.allowAdd"
-            >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 5v14M5 12h14"/>
-                </svg>
-                <span x-text="config.addButtonText || 'Aggiungi'"></span>
-            </button>
-        </div>
+            <!-- Actions Bar -->
+            <div class="base-actions-bar">
+                <div style="display: flex; gap: 12px;">
+                    <button type="submit" class="base-filter-reset" style="background-color: #2563eb; color: white; border-color: #2563eb;">
+                        Applica Filtri
+                    </button>
+                    <a href="{{ request.path }}" class="base-filter-reset" style="text-decoration: none; display: inline-flex; align-items: center;">
+                        Cancella Filtri
+                    </a>
+                </div>
+                
+                {% if table_config.allow_add %}
+                <a href="{{ table_config.add_url }}" class="base-add-button" style="text-decoration: none; display: inline-flex; align-items: center;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    <span>{{ table_config.add_button_text or 'Aggiungi' }}</span>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+        {% endif %}
     </div>
 
     <!-- Table Content -->
     <div class="base-table-wrapper">
-        <!-- Loading State -->
-        <div x-show="loading" class="base-loading-state">
-            <div class="base-loading-spinner"></div>
-            <p>Caricamento...</p>
-        </div>
-
         <!-- Empty State -->
-        <div x-show="!loading && showEmptyState" class="base-empty-state">
+        {% if table_config.data|length == 0 %}
+        <div class="base-empty-state">
             <div class="base-empty-state-icon">📋</div>
             <h3 class="base-empty-state-title">Nessun risultato</h3>
-            <p class="base-empty-state-description" x-text="config.emptyMessage"></p>
+            <p class="base-empty-state-description">{{ table_config.empty_message }}</p>
         </div>
+        {% endif %}
 
         <!-- Data Table -->
-        <table x-show="!loading && !showEmptyState" class="base-data-table">
+        {% if table_config.data|length > 0 %}
+        <table class="base-data-table">
             <thead>
                 <tr>
-                    <template x-for="column in config.columns" :key="column.key">
-                        <th class="base-table-header-cell" x-text="column.label"></th>
-                    </template>
-                    <th class="base-table-header-cell" x-show="hasActions">Azioni</th>
+                    {% for column in table_config.columns %}
+                    <th class="base-table-header-cell">{{ column.label }}</th>
+                    {% endfor %}
+                    {% if table_config.allow_edit or table_config.allow_delete %}
+                    <th class="base-table-header-cell">Azioni</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
-                <template x-for="(row, index) in displayedData" :key="index">
-                    <tr class="base-table-row">
-                        <template x-for="column in config.columns" :key="column.key">
-                            <td class="base-table-cell">
-                                <!-- Battery Column -->
-                                <div x-show="column.type === 'battery'" class="base-battery-indicator">
-                                    <span 
-                                        class="base-battery-icon"
-                                        :class="{
-                                            'base-battery-low': row[column.key] <= 20,
-                                            'base-battery-medium': row[column.key] > 20 && row[column.key] <= 60,
-                                            'base-battery-high': row[column.key] > 60
-                                        }"
-                                    >🔋</span>
-                                    <span x-text="row[column.key] ? row[column.key] + '%' : ''"></span>
-                                </div>
-                                
-                                <!-- Date Column -->
-                                <span x-show="column.type === 'datetime'" x-text="formatDateTime(row[column.key])"></span>
-                                
-                                <!-- Regular Text Column -->
-                                <span x-show="!column.type || column.type === 'text'" x-text="row[column.key] || ''"></span>
-                            </td>
-                        </template>
-                        
-                        <!-- Actions Column -->
-                        <td class="base-table-cell" x-show="hasActions">
-                            <div class="base-action-buttons">
-                                <button 
-                                    class="base-action-button base-edit" 
-                                    @click="handleEdit(row)"
-                                    x-show="config.allowEdit"
-                                    title="Modifica"
-                                >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                    </svg>
-                                </button>
-                                <button 
-                                    class="base-action-button base-delete" 
-                                    @click="confirmDelete(row)"
-                                    x-show="config.allowDelete"
-                                    title="Elimina"
-                                >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="3,6 5,6 21,6"/>
-                                        <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
-                                        <line x1="10" y1="11" x2="10" y2="17"/>
-                                        <line x1="14" y1="11" x2="14" y2="17"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                </template>
+                {% for row in table_config.data %}
+                <tr class="base-table-row">
+                    {% for column in table_config.columns %}
+                    <td class="base-table-cell">
+                        {% if column.type == 'battery' %}
+                        <div class="base-battery-indicator">
+                            <span class="base-battery-icon {% if row[column.key] %}{% if row[column.key] <= 20 %}base-battery-low{% elif row[column.key] <= 60 %}base-battery-medium{% else %}base-battery-high{% endif %}{% endif %}">🔋</span>
+                            <span>{% if row[column.key] %}{{ row[column.key] }}%{% endif %}</span>
+                        </div>
+                        {% elif column.type == 'datetime' %}
+                        <span>{{ row[column.key] | datetime_format }}</span>
+                        {% else %}
+                        <span>{{ row[column.key] or '' }}</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                    
+                    <!-- Actions Column -->
+                    {% if table_config.allow_edit or table_config.allow_delete %}
+                    <td class="base-table-cell">
+                        <div class="base-action-buttons">
+                            {% if table_config.allow_edit %}
+                            <a href="{{ table_config.edit_url.replace('{id}', row.id|string) }}" 
+                               class="base-action-button base-edit" 
+                               title="Modifica"
+                               style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                            </a>
+                            {% endif %}
+                            {% if table_config.allow_delete %}
+                            <button 
+                                class="base-action-button base-delete" 
+                                @click="confirmDelete({{ row.id }}, '{{ row.name or row.crew_member_name or row.tag_name or 'questo elemento' }}')"
+                                title="Elimina"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3,6 5,6 21,6"/>
+                                    <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+                                    <line x1="10" y1="11" x2="10" y2="17"/>
+                                    <line x1="14" y1="11" x2="14" y2="17"/>
+                                </svg>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
+        {% endif %}
     </div>
 
     <!-- Pagination Info -->
-    <div class="base-pagination-info" x-show="!loading && displayedData.length > 0">
-        Visualizzati <span x-text="displayedData.length"></span> di <span x-text="totalCount"></span> risultati
-        <span x-show="hasMoreData"> - Scorri per caricarne altri</span>
+    {% if table_config.data|length > 0 %}
+    <div class="base-pagination-info">
+        {% if table_config.total_count > table_config.data|length %}
+        Visualizzati {{ table_config.data|length }} di {{ table_config.total_count }} risultati
+        {% if table_config.page and table_config.page > 1 %}
+        {% set prev_page = table_config.page - 1 %}
+        <a href="{{ request.path }}?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ prev_page }}" 
+           style="margin-left: 16px; color: #2563eb; text-decoration: none;">← Precedente</a>
+        {% endif %}
+        {% if table_config.data|length >= 50 %}
+        {% set next_page = table_config.page + 1 %}
+        <a href="{{ request.path }}?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ next_page }}" 
+           style="margin-left: 16px; color: #2563eb; text-decoration: none;">Successiva →</a>
+        {% endif %}
+        {% else %}
+        {{ table_config.data|length }} risultati
+        {% endif %}
     </div>
+    {% endif %}
 
     <!-- Delete Confirmation Modal -->
     <div x-show="showDeleteModal" x-cloak class="base-modal-overlay" @click.self="showDeleteModal = false">
         <div class="base-modal-content" @click.stop>
             <h3 class="base-modal-title">Conferma Eliminazione</h3>
-            <p class="base-modal-description">Sei sicuro di voler eliminare questo elemento? Questa azione non può essere annullata.</p>
+            <p class="base-modal-description">Sei sicuro di voler eliminare <strong x-text="itemToDeleteName"></strong>? Questa azione non può essere annullata.</p>
             <div class="base-modal-actions">
                 <button class="base-modal-button base-secondary" @click="showDeleteModal = false">
                     Annulla
@@ -200,188 +215,59 @@
 </div>
 
 <script>
-function gateKeeperTable(initialConfig) {
+function gateKeeperTable() {
     return {
-        // Configuration
-        config: JSON.parse(atob(initialConfig)),
-
-        // Data
-        data: [],
-        displayedData: [],
-        totalCount: 0,
-        loading: false,
-        hasMoreData: true,
-        currentPage: 1,
-        pageSize: 50,
-
-        // Filters
-        filters: {},
-
-        // Modal
+        // Modal only
         showDeleteModal: false,
         itemToDelete: null,
+        itemToDeleteName: '',
 
         init() {
-            this.setDefaultFilters();
-            this.applyFilters();
+            // Auto-submit form when certain inputs change (with debounce)
+            const textInputs = this.$el.querySelectorAll('input[type="text"]');
+            const selects = this.$el.querySelectorAll('select');
+            const checkboxes = this.$el.querySelectorAll('input[type="checkbox"]');
             
-            // Set up infinite scroll
-            this.$nextTick(() => {
-                this.setupInfiniteScroll();
+            let debounceTimer;
+            
+            const submitForm = () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    const form = this.$el.querySelector('form');
+                    if (form) form.submit();
+                }, 500);
+            };
+            
+            textInputs.forEach(input => {
+                input.addEventListener('input', submitForm);
             });
-        },
-
-        setDefaultFilters() {
-            // Set default date filters if they exist
-            if (this.config.dateFilters) {
-                this.config.dateFilters.forEach(filter => {
-                    if (filter.defaultValue) {
-                        this.filters[filter.key] = filter.defaultValue;
-                    }
+            
+            selects.forEach(select => {
+                select.addEventListener('change', () => {
+                    const form = this.$el.querySelector('form');
+                    if (form) form.submit();
                 });
-            }
-        },
-
-        setupInfiniteScroll() {
-            const tableWrapper = this.$el.querySelector('.base-table-wrapper');
-            if (tableWrapper) {
-                tableWrapper.addEventListener('scroll', () => {
-                    if (tableWrapper.scrollTop + tableWrapper.clientHeight >= tableWrapper.scrollHeight - 5) {
-                        this.loadMoreData();
-                    }
+            });
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    const form = this.$el.querySelector('form');
+                    if (form) form.submit();
                 });
-            }
-        },
-
-        // Computed properties
-        get hasFilters() {
-            return (this.config.textFilters && this.config.textFilters.length > 0) || 
-                   (this.config.selectFilters && this.config.selectFilters.length > 0) || 
-                   (this.config.dateFilters && this.config.dateFilters.length > 0) || 
-                   (this.config.checkboxFilters && this.config.checkboxFilters.length > 0);
-        },
-
-        get hasActiveFilters() {
-            return Object.values(this.filters).some(value => value !== '' && value !== null && value !== false);
-        },
-
-        get hasActions() {
-            return this.config.allowEdit || this.config.allowDelete;
-        },
-
-        get showEmptyState() {
-            return this.displayedData.length === 0 && this.totalCount === 0;
-        },
-
-        // Methods
-        async applyFilters() {
-            this.loading = true;
-            this.currentPage = 1;
-            
-            try {
-                const response = await fetch(this.config.apiEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: JSON.stringify({
-                        filters: this.filters,
-                        page: this.currentPage,
-                        page_size: this.pageSize
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    this.displayedData = data.items;
-                    this.totalCount = data.total;
-                    this.hasMoreData = data.has_more;
-                } else {
-                    console.error('Filter error:', data.error);
-                }
-            } catch (error) {
-                console.error('Network error:', error);
-            }
-            
-            this.loading = false;
-        },
-
-        async loadMoreData() {
-            if (!this.hasMoreData || this.loading) return;
-            
-            this.loading = true;
-            this.currentPage++;
-            
-            try {
-                const response = await fetch(this.config.apiEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: JSON.stringify({
-                        filters: this.filters,
-                        page: this.currentPage,
-                        page_size: this.pageSize
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    this.displayedData.push(...data.items);
-                    this.hasMoreData = data.has_more;
-                }
-            } catch (error) {
-                console.error('Load more error:', error);
-            }
-            
-            this.loading = false;
-        },
-
-        resetFilters() {
-            this.filters = {};
-            this.setDefaultFilters();
-            this.applyFilters();
-        },
-
-        formatDateTime(dateString) {
-            if (!dateString) return '';
-            const date = new Date(dateString);
-            return date.toLocaleString('it-IT', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
             });
         },
 
         // Action handlers
-        handleAdd() {
-            if (this.config.addUrl) {
-                window.location.href = this.config.addUrl;
-            }
-        },
-
-        handleEdit(item) {
-            if (this.config.editUrl) {
-                window.location.href = this.config.editUrl.replace('{id}', item.id);
-            }
-        },
-
-        confirmDelete(item) {
-            this.itemToDelete = item;
+        confirmDelete(itemId, itemName) {
+            this.itemToDelete = itemId;
+            this.itemToDeleteName = itemName;
             this.showDeleteModal = true;
         },
 
         async handleDelete() {
-            if (this.itemToDelete && this.config.deleteUrl) {
+            if (this.itemToDelete) {
                 try {
-                    const response = await fetch(this.config.deleteUrl.replace('{id}', this.itemToDelete.id), {
+                    const response = await fetch('{{ table_config.delete_url }}'.replace('{id}', this.itemToDelete), {
                         method: 'DELETE',
                         headers: {
                             'X-Requested-With': 'XMLHttpRequest'
@@ -389,15 +275,19 @@ function gateKeeperTable(initialConfig) {
                     });
                     
                     if (response.ok) {
-                        this.displayedData = this.displayedData.filter(item => item.id !== this.itemToDelete.id);
-                        this.totalCount--;
+                        // Reload the page to show updated data
+                        window.location.reload();
+                    } else {
+                        alert('Errore durante l\'eliminazione');
                     }
                 } catch (error) {
                     console.error('Delete error:', error);
+                    alert('Errore durante l\'eliminazione');
                 }
             }
             this.showDeleteModal = false;
             this.itemToDelete = null;
+            this.itemToDeleteName = '';
         }
     };
 }
