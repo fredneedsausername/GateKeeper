@@ -37,18 +37,6 @@
                         class="base-filter-input"
                         placeholder="{{ filter.placeholder }}"
                     >
-                    <select 
-                        x-show="options.length > 0"
-                        x-model="selectedValue"
-                        name="{{ filter.key }}"
-                        class="base-filter-select"
-                        style="margin-top: 4px;"
-                    >
-                        <option value="">Tutti</option>
-                        <template x-for="option in options" :key="option.value">
-                            <option :value="option.value" x-text="option.label"></option>
-                        </template>
-                    </select>
                 </div>
                 {% endfor %}
 
@@ -191,7 +179,7 @@ function gateKeeperTable() {
     };
 }
 
-// Searchable filter component (same as before but without form auto-submit)
+// Searchable filter component
 function searchableFilter(filterKey, searchEndpoint, initialValue) {
     return {
         filterKey: filterKey,
@@ -199,6 +187,7 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
         searchText: '',
         selectedValue: initialValue,
         options: [],
+        isLoading: false,
         
         init() {
             // If there's an initial value, we should show it in the search text
@@ -209,6 +198,7 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
         
         async loadInitialOption() {
             // Load the label for the initially selected value
+            this.isLoading = true;
             try {
                 const response = await fetch(this.searchEndpoint, {
                     method: 'POST',
@@ -223,14 +213,19 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
                 
                 const data = await response.json();
                 if (data.options && data.options.length > 0) {
-                    this.options = data.options;
-                    const selectedOption = this.options.find(opt => opt.value == this.selectedValue);
+                    const selectedOption = data.options.find(opt => opt.value == this.selectedValue);
                     if (selectedOption) {
                         this.searchText = selectedOption.label;
+                        // Only set options if we actually need to show the dropdown
+                        if (this.searchText.length >= 2) {
+                            this.options = data.options;
+                        }
                     }
                 }
             } catch (error) {
                 console.error('Error loading initial option:', error);
+            } finally {
+                this.isLoading = false;
             }
         },
         
@@ -240,6 +235,7 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
                 return;
             }
             
+            this.isLoading = true;
             try {
                 const response = await fetch(this.searchEndpoint, {
                     method: 'POST',
@@ -254,6 +250,8 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
             } catch (error) {
                 console.error('Search error:', error);
                 this.options = [];
+            } finally {
+                this.isLoading = false;
             }
         },
         
@@ -266,6 +264,7 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
                 }
             } else {
                 this.searchText = '';
+                this.options = []; // Clear options when no selection
             }
             
             // HTMX will handle the form update automatically due to the change event
