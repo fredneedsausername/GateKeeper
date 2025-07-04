@@ -1,11 +1,11 @@
-<div class="base-table-container" x-data="gateKeeperTable()">
+<div class="base-table-container" x-data="gateKeeperTable()" x-init="init()"
     <!-- Table Header -->
     <div class="base-table-header">
         <h2 class="base-table-title">{{ table_config.title }}</h2>
         <p class="base-table-description">{{ table_config.description }}</p>
         
         <!-- Filters Section -->
-        {% if table_config.text_filters or table_config.select_filters or table_config.date_filters or table_config.checkbox_filters %}
+        {% if table_config.text_filters or table_config.select_filters or table_config.searchable_select_filters or table_config.date_filters or table_config.checkbox_filters %}
         <form method="GET" action="{{ request.path }}">
             <div class="base-filters-section">
                 <!-- Text Filters -->
@@ -22,7 +22,34 @@
                 </div>
                 {% endfor %}
 
-                <!-- Select Filters -->
+                <!-- Searchable Select Filters (Text input + Dynamic dropdown) -->
+                {% for filter in table_config.searchable_select_filters %}
+                <div class="base-filter-group" x-data="searchableFilter('{{ filter.key }}', '{{ filter.search_endpoint }}', '{{ request.args.get(filter.key, '') }}')">
+                    <label class="base-filter-label">{{ filter.label }}</label>
+                    <input 
+                        type="text" 
+                        x-model="searchText"
+                        @input.debounce.500ms="searchOptions()"
+                        class="base-filter-input"
+                        placeholder="{{ filter.placeholder }}"
+                    >
+                    <select 
+                        x-show="options.length > 0"
+                        x-model="selectedValue"
+                        name="{{ filter.key }}"
+                        class="base-filter-select"
+                        @change="updateForm()"
+                        style="margin-top: 4px;"
+                    >
+                        <option value="">Tutti</option>
+                        <template x-for="option in options" :key="option.value">
+                            <option :value="option.value" x-text="option.label"></option>
+                        </template>
+                    </select>
+                </div>
+                {% endfor %}
+
+                <!-- Regular Select Filters -->
                 {% for filter in table_config.select_filters %}
                 <div class="base-filter-group">
                     <label class="base-filter-label">{{ filter.label }}</label>
@@ -224,8 +251,8 @@ function gateKeeperTable() {
 
         init() {
             // Auto-submit form when certain inputs change (with debounce)
-            const textInputs = this.$el.querySelectorAll('input[type="text"]');
-            const selects = this.$el.querySelectorAll('select');
+            const textInputs = this.$el.querySelectorAll('input[type="text"]:not([x-model])'); // Exclude Alpine.js managed inputs
+            const selects = this.$el.querySelectorAll('select:not([x-model])'); // Exclude Alpine.js managed selects
             const checkboxes = this.$el.querySelectorAll('input[type="checkbox"]');
             
             let debounceTimer;
@@ -267,7 +294,8 @@ function gateKeeperTable() {
         async handleDelete() {
             if (this.itemToDelete) {
                 try {
-                    const response = await fetch('{{ table_config.delete_url }}'.replace('{id}', this.itemToDelete), {
+                    const deleteUrl = '{{ table_config.delete_url }}'.replace('{id}', this.itemToDelete);
+                    const response = await fetch(deleteUrl, {
                         method: 'DELETE',
                         headers: {
                             'X-Requested-With': 'XMLHttpRequest'
@@ -288,6 +316,92 @@ function gateKeeperTable() {
             this.showDeleteModal = false;
             this.itemToDelete = null;
             this.itemToDeleteName = '';
+        }
+    };
+}
+
+// Searchable filter component
+function searchableFilter(filterKey, searchEndpoint, initialValue) {
+    return {
+        filterKey: filterKey,
+        searchEndpoint: searchEndpoint,
+        searchText: '',
+        selectedValue: initialValue,
+        options: [],
+        
+        init() {
+            // If there's an initial value, we should show it in the search text
+            if (this.selectedValue) {
+                this.loadInitialOption();
+            }
+        },
+        
+        async loadInitialOption() {
+            // Load the label for the initially selected value
+            try {
+                const response = await fetch(this.searchEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        query: '',
+                        selected_id: this.selectedValue 
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.options && data.options.length > 0) {
+                    this.options = data.options;
+                    const selectedOption = this.options.find(opt => opt.value == this.selectedValue);
+                    if (selectedOption) {
+                        this.searchText = selectedOption.label;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading initial option:', error);
+            }
+        },
+        
+        async searchOptions() {
+            if (this.searchText.length < 2) {
+                this.options = [];
+                return;
+            }
+            
+            try {
+                const response = await fetch(this.searchEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: this.searchText })
+                });
+                
+                const data = await response.json();
+                this.options = data.options || [];
+            } catch (error) {
+                console.error('Search error:', error);
+                this.options = [];
+            }
+        },
+        
+        updateForm() {
+            // Update search text to show the selected option's label
+            if (this.selectedValue) {
+                const selectedOption = this.options.find(opt => opt.value == this.selectedValue);
+                if (selectedOption) {
+                    this.searchText = selectedOption.label;
+                }
+            } else {
+                this.searchText = '';
+            }
+            
+            // Auto-submit the form
+            setTimeout(() => {
+                const form = this.$el.closest('form');
+                if (form) form.submit();
+            }, 100);
         }
     };
 }

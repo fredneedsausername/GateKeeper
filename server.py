@@ -146,11 +146,6 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             return items, total
             
         elif table_type == "ship":
-            # Only show results if there are actual filters applied
-            has_filters = any(v for v in filters.values() if v and str(v).strip())
-            if not has_filters:
-                return [], 0
-                
             query = "SELECT id, name FROM ship WHERE 1=1"
             params = []
             
@@ -389,9 +384,6 @@ def logout():
 @app.route('/crew')
 @auth_required
 def crew_page():
-    ships = get_ships_for_dropdown()
-    roles = get_roles_for_dropdown()
-    
     # Get filters from URL parameters
     filters = {
         'crew_name': request.args.get('crew_name', ''),
@@ -419,12 +411,11 @@ def crew_page():
             {"key": "role_name", "label": "Ruolo", "type": "text"}
         ],
         "text_filters": [
-            {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."},
-            {"key": "ship_name", "label": "Nome Nave", "placeholder": "Cerca per nave..."}
+            {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
         ],
-        "select_filters": [
-            {"key": "role_id", "label": "Ruolo", "options": roles},
-            {"key": "ship_id", "label": "Nave", "options": ships}
+        "searchable_select_filters": [
+            {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"},
+            {"key": "role_id", "label": "Ruolo", "placeholder": "Cerca ruolo...", "search_endpoint": "/api/roles/filter"}
         ],
         "allow_add": True,
         "allow_edit": True,
@@ -563,7 +554,7 @@ def ships_page():
         "allow_edit": True,
         "allow_delete": True,
         "add_button_text": "Aggiungi Nave",
-        "empty_message": "Applica dei filtri per visualizzare le navi.",
+        "empty_message": "Nessuna nave trovata.",
         "add_url": "/navi/add",
         "edit_url": "/navi/edit/{id}",
         "delete_url": "/api/ships/delete/{id}",
@@ -815,8 +806,6 @@ def entries_page():
         print(f"Error in entries_page: {e}")
         data, total_count = [], 0
     
-    shipyards = get_shipyards_for_dropdown()
-    
     table_config = {
         "title": "Log Entrate",
         "description": "Visualizza le entrate di tag non assegnati",
@@ -839,8 +828,8 @@ def entries_page():
                 "default_value": now.strftime('%Y-%m-%dT%H:%M')
             }
         ],
-        "select_filters": [
-            {"key": "shipyard_id", "label": "Cantiere", "options": shipyards}
+        "searchable_select_filters": [
+            {"key": "shipyard_id", "label": "Cantiere", "placeholder": "Cerca cantiere...", "search_endpoint": "/api/shipyards/filter"}
         ],
         "text_filters": [
             {"key": "tag_name", "label": "Nome Tag", "placeholder": "Cerca tag esatto..."}
@@ -893,9 +882,6 @@ def logs_page():
         print(f"Error in logs_page: {e}")
         data, total_count = [], 0
     
-    shipyards = get_shipyards_for_dropdown()
-    ships = get_ships_for_dropdown()
-    
     table_config = {
         "title": "Log Permanenze",
         "description": "Visualizza i log di permanenza nei cantieri",
@@ -921,9 +907,9 @@ def logs_page():
                 "default_value": now.strftime('%Y-%m-%dT%H:%M')
             }
         ],
-        "select_filters": [
-            {"key": "shipyard_id", "label": "Cantiere", "options": shipyards},
-            {"key": "ship_id", "label": "Nave", "options": ships}
+        "searchable_select_filters": [
+            {"key": "shipyard_id", "label": "Cantiere", "placeholder": "Cerca cantiere...", "search_endpoint": "/api/shipyards/filter"},
+            {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"}
         ],
         "text_filters": [
             {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
@@ -1135,6 +1121,92 @@ def search_shipyards(curs):
     shipyards = curs.fetchall()
     
     return jsonify({"shipyards": shipyards})
+
+# ===== NEW FILTER SEARCH ENDPOINTS =====
+
+@app.route('/api/ships/filter', methods=['POST'])
+@auth_required
+@connected_to_database
+def filter_ships(curs):
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    selected_id = data.get('selected_id')
+    
+    # If we have a selected_id but no query, return just that item
+    if selected_id and not query:
+        curs.execute("SELECT id, name FROM ship WHERE id = %s", [selected_id])
+        ship = curs.fetchone()
+        if ship:
+            return jsonify({"options": [{"value": ship["id"], "label": ship["name"]}]})
+        return jsonify({"options": []})
+    
+    if len(query) < 2:
+        return jsonify({"options": []})
+    
+    curs.execute(
+        "SELECT id, name FROM ship WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
+        [f"%{query}%"]
+    )
+    ships = curs.fetchall()
+    
+    options = [{"value": ship["id"], "label": ship["name"]} for ship in ships]
+    return jsonify({"options": options})
+
+@app.route('/api/roles/filter', methods=['POST'])
+@auth_required
+@connected_to_database
+def filter_roles(curs):
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    selected_id = data.get('selected_id')
+    
+    # If we have a selected_id but no query, return just that item
+    if selected_id and not query:
+        curs.execute("SELECT id, role_name FROM crew_member_roles WHERE id = %s", [selected_id])
+        role = curs.fetchone()
+        if role:
+            return jsonify({"options": [{"value": role["id"], "label": role["role_name"]}]})
+        return jsonify({"options": []})
+    
+    if len(query) < 2:
+        return jsonify({"options": []})
+    
+    curs.execute(
+        "SELECT id, role_name FROM crew_member_roles WHERE LOWER(role_name) LIKE LOWER(%s) ORDER BY role_name LIMIT 10",
+        [f"%{query}%"]
+    )
+    roles = curs.fetchall()
+    
+    options = [{"value": role["id"], "label": role["role_name"]} for role in roles]
+    return jsonify({"options": options})
+
+@app.route('/api/shipyards/filter', methods=['POST'])
+@auth_required
+@connected_to_database
+def filter_shipyards(curs):
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    selected_id = data.get('selected_id')
+    
+    # If we have a selected_id but no query, return just that item
+    if selected_id and not query:
+        curs.execute("SELECT id, name FROM shipyard WHERE id = %s", [selected_id])
+        shipyard = curs.fetchone()
+        if shipyard:
+            return jsonify({"options": [{"value": shipyard["id"], "label": shipyard["name"]}]})
+        return jsonify({"options": []})
+    
+    if len(query) < 2:
+        return jsonify({"options": []})
+    
+    curs.execute(
+        "SELECT id, name FROM shipyard WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
+        [f"%{query}%"]
+    )
+    shipyards = curs.fetchall()
+    
+    options = [{"value": shipyard["id"], "label": shipyard["name"]} for shipyard in shipyards]
+    return jsonify({"options": options})
 
 if __name__ == "__main__":
     flask_env = get_env("FLASK_ENV")
