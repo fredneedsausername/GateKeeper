@@ -18,7 +18,7 @@ It's important to choose the right stack for the job. This robust combination en
 
 ### Frontend
 - **Structure:** Multi Page Application
-- **Reactivity:** Alpine.js 
+- **Reactivity:** Alpine.js + HTMX
 - **Styling:** CSS
 
 ### Backend
