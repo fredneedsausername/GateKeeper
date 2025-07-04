@@ -1,0 +1,125 @@
+<!-- Table Content -->
+<div class="base-table-wrapper">
+    <!-- Empty State -->
+    {% if table_config.data|length == 0 %}
+    <div class="base-empty-state">
+        <div class="base-empty-state-icon">📋</div>
+        <h3 class="base-empty-state-title">Nessun risultato</h3>
+        <p class="base-empty-state-description">{{ table_config.empty_message }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Data Table -->
+    {% if table_config.data|length > 0 %}
+    <table class="base-data-table">
+        <thead>
+            <tr>
+                {% for column in table_config.columns %}
+                <th class="base-table-header-cell">{{ column.label }}</th>
+                {% endfor %}
+                {% if table_config.allow_edit or table_config.allow_delete %}
+                <th class="base-table-header-cell">Azioni</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_config.data %}
+            <tr class="base-table-row">
+                {% for column in table_config.columns %}
+                <td class="base-table-cell">
+                    {% if column.type == 'battery' %}
+                    <div class="base-battery-indicator">
+                        <span class="base-battery-icon {% if row[column.key] %}{% if row[column.key] <= 20 %}base-battery-low{% elif row[column.key] <= 60 %}base-battery-medium{% else %}base-battery-high{% endif %}{% endif %}">🔋</span>
+                        <span>{% if row[column.key] %}{{ row[column.key] }}%{% endif %}</span>
+                    </div>
+                    {% elif column.type == 'datetime' %}
+                    <span>{{ row[column.key] | datetime_format }}</span>
+                    {% else %}
+                    <span>{{ row[column.key] or '' }}</span>
+                    {% endif %}
+                </td>
+                {% endfor %}
+                
+                <!-- Actions Column -->
+                {% if table_config.allow_edit or table_config.allow_delete %}
+                <td class="base-table-cell">
+                    <div class="base-action-buttons">
+                        {% if table_config.allow_edit %}
+                        <a href="{{ table_config.edit_url.replace('{id}', row.id|string) }}" 
+                           class="base-action-button base-edit" 
+                           title="Modifica"
+                           style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </a>
+                        {% endif %}
+                        {% if table_config.allow_delete %}
+                        <button 
+                            class="base-action-button base-delete" 
+                            @click="$dispatch('confirm-delete', { id: {{ row.id }}, name: '{{ row.name or row.crew_member_name or row.tag_name or 'questo elemento' }}' })"
+                            title="Elimina"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3,6 5,6 21,6"/>
+                                <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                        </button>
+                        {% endif %}
+                    </div>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+<!-- Pagination Info -->
+{% if table_config.data|length > 0 %}
+<div class="base-pagination-info">
+    {% if table_config.total_count > table_config.data|length %}
+    Visualizzati {{ table_config.data|length }} di {{ table_config.total_count }} risultati
+    {% if table_config.page and table_config.page > 1 %}
+    {% set prev_page = table_config.page - 1 %}
+    <button 
+        hx-get="{{ request.path }}/partial?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ prev_page }}" 
+        hx-target="#table-content"
+        hx-indicator=".htmx-indicator"
+        style="margin-left: 16px; color: #2563eb; background: none; border: none; cursor: pointer; text-decoration: underline;">
+        ← Precedente
+    </button>
+    {% endif %}
+    {% if table_config.data|length >= 50 %}
+    {% set next_page = table_config.page + 1 %}
+    <button 
+        hx-get="{{ request.path }}/partial?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ next_page }}" 
+        hx-target="#table-content"
+        hx-indicator=".htmx-indicator"
+        style="margin-left: 16px; color: #2563eb; background: none; border: none; cursor: pointer; text-decoration: underline;">
+        Successiva →
+    </button>
+    {% endif %}
+    {% else %}
+    {{ table_config.data|length }} risultati
+    {% endif %}
+</div>
+{% endif %}
+
+<script>
+// Listen for delete confirmation events from the table rows
+document.addEventListener('confirm-delete', function(event) {
+    // Find the parent table container and dispatch to its Alpine component
+    const tableContainer = event.target.closest('.base-table-container');
+    if (tableContainer && tableContainer._x_dataStack) {
+        const component = tableContainer._x_dataStack[0];
+        if (component.confirmDelete) {
+            component.confirmDelete(event.detail.id, event.detail.name);
+        }
+    }
+});
+</script>

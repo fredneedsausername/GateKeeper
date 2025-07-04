@@ -1,4 +1,4 @@
-<div class="base-table-container" x-data="gateKeeperTable()" x-init="init()"
+<div class="base-table-container" x-data="gateKeeperTable()">
     <!-- Table Header -->
     <div class="base-table-header">
         <h2 class="base-table-title">{{ table_config.title }}</h2>
@@ -6,7 +6,11 @@
         
         <!-- Filters Section -->
         {% if table_config.text_filters or table_config.select_filters or table_config.searchable_select_filters or table_config.date_filters or table_config.checkbox_filters %}
-        <form method="GET" action="{{ request.path }}">
+        <div hx-get="{{ request.path }}/partial" 
+             hx-target="#table-content" 
+             hx-trigger="input delay:500ms from:input, change from:select, change from:input[type=checkbox], submit"
+             hx-include="[name]"
+             hx-indicator=".htmx-indicator">
             <div class="base-filters-section">
                 <!-- Text Filters -->
                 {% for filter in table_config.text_filters %}
@@ -38,7 +42,6 @@
                         x-model="selectedValue"
                         name="{{ filter.key }}"
                         class="base-filter-select"
-                        @change="updateForm()"
                         style="margin-top: 4px;"
                     >
                         <option value="">Tutti</option>
@@ -118,111 +121,14 @@
                 </a>
                 {% endif %}
             </div>
-        </form>
-        {% endif %}
-    </div>
-
-    <!-- Table Content -->
-    <div class="base-table-wrapper">
-        <!-- Empty State -->
-        {% if table_config.data|length == 0 %}
-        <div class="base-empty-state">
-            <div class="base-empty-state-icon">📋</div>
-            <h3 class="base-empty-state-title">Nessun risultato</h3>
-            <p class="base-empty-state-description">{{ table_config.empty_message }}</p>
         </div>
         {% endif %}
-
-        <!-- Data Table -->
-        {% if table_config.data|length > 0 %}
-        <table class="base-data-table">
-            <thead>
-                <tr>
-                    {% for column in table_config.columns %}
-                    <th class="base-table-header-cell">{{ column.label }}</th>
-                    {% endfor %}
-                    {% if table_config.allow_edit or table_config.allow_delete %}
-                    <th class="base-table-header-cell">Azioni</th>
-                    {% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in table_config.data %}
-                <tr class="base-table-row">
-                    {% for column in table_config.columns %}
-                    <td class="base-table-cell">
-                        {% if column.type == 'battery' %}
-                        <div class="base-battery-indicator">
-                            <span class="base-battery-icon {% if row[column.key] %}{% if row[column.key] <= 20 %}base-battery-low{% elif row[column.key] <= 60 %}base-battery-medium{% else %}base-battery-high{% endif %}{% endif %}">🔋</span>
-                            <span>{% if row[column.key] %}{{ row[column.key] }}%{% endif %}</span>
-                        </div>
-                        {% elif column.type == 'datetime' %}
-                        <span>{{ row[column.key] | datetime_format }}</span>
-                        {% else %}
-                        <span>{{ row[column.key] or '' }}</span>
-                        {% endif %}
-                    </td>
-                    {% endfor %}
-                    
-                    <!-- Actions Column -->
-                    {% if table_config.allow_edit or table_config.allow_delete %}
-                    <td class="base-table-cell">
-                        <div class="base-action-buttons">
-                            {% if table_config.allow_edit %}
-                            <a href="{{ table_config.edit_url.replace('{id}', row.id|string) }}" 
-                               class="base-action-button base-edit" 
-                               title="Modifica"
-                               style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                </svg>
-                            </a>
-                            {% endif %}
-                            {% if table_config.allow_delete %}
-                            <button 
-                                class="base-action-button base-delete" 
-                                @click="confirmDelete({{ row.id }}, '{{ row.name or row.crew_member_name or row.tag_name or 'questo elemento' }}')"
-                                title="Elimina"
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="3,6 5,6 21,6"/>
-                                    <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
-                                    <line x1="10" y1="11" x2="10" y2="17"/>
-                                    <line x1="14" y1="11" x2="14" y2="17"/>
-                                </svg>
-                            </button>
-                            {% endif %}
-                        </div>
-                    </td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% endif %}
     </div>
 
-    <!-- Pagination Info -->
-    {% if table_config.data|length > 0 %}
-    <div class="base-pagination-info">
-        {% if table_config.total_count > table_config.data|length %}
-        Visualizzati {{ table_config.data|length }} di {{ table_config.total_count }} risultati
-        {% if table_config.page and table_config.page > 1 %}
-        {% set prev_page = table_config.page - 1 %}
-        <a href="{{ request.path }}?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ prev_page }}" 
-           style="margin-left: 16px; color: #2563eb; text-decoration: none;">← Precedente</a>
-        {% endif %}
-        {% if table_config.data|length >= 50 %}
-        {% set next_page = table_config.page + 1 %}
-        <a href="{{ request.path }}?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ next_page }}" 
-           style="margin-left: 16px; color: #2563eb; text-decoration: none;">Successiva →</a>
-        {% endif %}
-        {% else %}
-        {{ table_config.data|length }} risultati
-        {% endif %}
+    <!-- Table Content (This will be replaced by HTMX) -->
+    <div id="table-content">
+        {% include 'table_content_partial.html' %}
     </div>
-    {% endif %}
 
     <!-- Delete Confirmation Modal -->
     <div x-show="showDeleteModal" x-cloak class="base-modal-overlay" @click.self="showDeleteModal = false">
@@ -249,41 +155,6 @@ function gateKeeperTable() {
         itemToDelete: null,
         itemToDeleteName: '',
 
-        init() {
-            // Auto-submit form when certain inputs change (with debounce)
-            const textInputs = this.$el.querySelectorAll('input[type="text"]:not([x-model])'); // Exclude Alpine.js managed inputs
-            const selects = this.$el.querySelectorAll('select:not([x-model])'); // Exclude Alpine.js managed selects
-            const checkboxes = this.$el.querySelectorAll('input[type="checkbox"]');
-            
-            let debounceTimer;
-            
-            const submitForm = () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    const form = this.$el.querySelector('form');
-                    if (form) form.submit();
-                }, 500);
-            };
-            
-            textInputs.forEach(input => {
-                input.addEventListener('input', submitForm);
-            });
-            
-            selects.forEach(select => {
-                select.addEventListener('change', () => {
-                    const form = this.$el.querySelector('form');
-                    if (form) form.submit();
-                });
-            });
-            
-            checkboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', () => {
-                    const form = this.$el.querySelector('form');
-                    if (form) form.submit();
-                });
-            });
-        },
-
         // Action handlers
         confirmDelete(itemId, itemName) {
             this.itemToDelete = itemId;
@@ -303,8 +174,8 @@ function gateKeeperTable() {
                     });
                     
                     if (response.ok) {
-                        // Reload the page to show updated data
-                        window.location.reload();
+                        // Trigger HTMX refresh instead of full page reload
+                        htmx.trigger('#table-content', 'refresh');
                     } else {
                         alert('Errore durante l\'eliminazione');
                     }
@@ -320,7 +191,7 @@ function gateKeeperTable() {
     };
 }
 
-// Searchable filter component
+// Searchable filter component (same as before but without form auto-submit)
 function searchableFilter(filterKey, searchEndpoint, initialValue) {
     return {
         filterKey: filterKey,
@@ -397,12 +268,21 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
                 this.searchText = '';
             }
             
-            // Auto-submit the form
-            setTimeout(() => {
-                const form = this.$el.closest('form');
-                if (form) form.submit();
-            }, 100);
+            // HTMX will handle the form update automatically due to the change event
         }
     };
 }
+
+// Listen for HTMX events to refresh table content after delete
+document.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.xhr.status === 200 && evt.detail.requestConfig.verb === 'delete') {
+        // Refresh the table content after successful delete
+        const tableContent = document.getElementById('table-content');
+        if (tableContent) {
+            htmx.ajax('GET', window.location.pathname + '/partial?' + new URLSearchParams(new FormData(document.querySelector('[hx-include]'))).toString(), {
+                target: '#table-content'
+            });
+        }
+    }
+});
 </script>

@@ -98,14 +98,17 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             if not has_filters:
                 return [], 0
                 
-            query = """
-                SELECT 
-                    cm.id,
-                    cm.name as crew_member_name,
-                    cr.role_name,
-                    s.name as ship_name,
-                    t.name as tag_name,
-                    t.remaining_battery as battery_level
+            # Base query parts
+            select_fields = """
+                cm.id,
+                cm.name as crew_member_name,
+                cr.role_name,
+                s.name as ship_name,
+                t.name as tag_name,
+                t.remaining_battery as battery_level
+            """
+            
+            from_where = """
                 FROM crew_member cm
                 LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
                 LEFT JOIN ship s ON cm.ship_id = s.id
@@ -114,104 +117,117 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             """
             
             params = []
+            filter_conditions = ""
             
             if filters.get('crew_name') and filters['crew_name'].strip():
-                query += " AND LOWER(cm.name) LIKE LOWER(%s)"
+                filter_conditions += " AND LOWER(cm.name) LIKE LOWER(%s)"
                 params.append(f"%{filters['crew_name'].strip()}%")
             
             if filters.get('ship_name') and filters['ship_name'].strip():
-                query += " AND LOWER(s.name) LIKE LOWER(%s)"
+                filter_conditions += " AND LOWER(s.name) LIKE LOWER(%s)"
                 params.append(f"%{filters['ship_name'].strip()}%")
             
             if filters.get('role_id') and filters['role_id'].strip():
-                query += " AND cm.role_id = %s"
+                filter_conditions += " AND cm.role_id = %s"
                 params.append(int(filters['role_id']))
             
             if filters.get('ship_id') and filters['ship_id'].strip():
-                query += " AND cm.ship_id = %s"
+                filter_conditions += " AND cm.ship_id = %s"
                 params.append(int(filters['ship_id']))
             
             # Count total
-            count_query = query.replace("SELECT cm.id, cm.name as crew_member_name, cr.role_name, s.name as ship_name, t.name as tag_name, t.remaining_battery as battery_level", "SELECT COUNT(*)")
+            count_query = f"SELECT COUNT(*) as count {from_where} {filter_conditions}"
             curs.execute(count_query, params)
-            total = curs.fetchone()['count']
+            result = curs.fetchone()
+            total = result['count'] if result else 0
             
-            # Add pagination
-            query += " ORDER BY cm.name LIMIT %s OFFSET %s"
+            # Get data with pagination
+            data_query = f"SELECT {select_fields} {from_where} {filter_conditions} ORDER BY cm.name LIMIT %s OFFSET %s"
             params.extend([page_size, (page - 1) * page_size])
             
-            curs.execute(query, params)
+            curs.execute(data_query, params)
             items = curs.fetchall()
             
             return items, total
             
         elif table_type == "ship":
-            query = "SELECT id, name FROM ship WHERE 1=1"
+            # Base query parts
+            from_where = "FROM ship WHERE 1=1"
             params = []
+            filter_conditions = ""
             
             if filters.get('ship_name') and filters['ship_name'].strip():
-                query += " AND LOWER(name) LIKE LOWER(%s)"
+                filter_conditions += " AND LOWER(name) LIKE LOWER(%s)"
                 params.append(f"%{filters['ship_name'].strip()}%")
             
             # Count total
-            count_query = query.replace("SELECT id, name", "SELECT COUNT(*)")
+            count_query = f"SELECT COUNT(*) as count {from_where} {filter_conditions}"
             curs.execute(count_query, params)
-            total = curs.fetchone()['count']
+            result = curs.fetchone()
+            total = result['count'] if result else 0
             
-            # Add pagination
-            query += " ORDER BY name LIMIT %s OFFSET %s"
+            # Get data with pagination
+            data_query = f"SELECT id, name {from_where} {filter_conditions} ORDER BY name LIMIT %s OFFSET %s"
             params.extend([page_size, (page - 1) * page_size])
             
-            curs.execute(query, params)
+            curs.execute(data_query, params)
             items = curs.fetchall()
             
             return items, total
             
         elif table_type == "tag":
-            query = """
-                SELECT 
-                    t.id,
-                    t.name,
-                    t.remaining_battery,
-                    cm.name as crew_member_name
+            # Base query parts
+            select_fields = """
+                t.id,
+                t.name,
+                t.remaining_battery,
+                cm.name as crew_member_name
+            """
+            
+            from_where = """
                 FROM tag t
                 LEFT JOIN crew_member cm ON t.id = cm.tag_id
                 WHERE 1=1
             """
             
             params = []
+            filter_conditions = ""
             
             if filters.get('assigned') and not filters.get('vacant'):
-                query += " AND cm.id IS NOT NULL"
+                filter_conditions += " AND cm.id IS NOT NULL"
             elif filters.get('vacant') and not filters.get('assigned'):
-                query += " AND cm.id IS NULL"
+                filter_conditions += " AND cm.id IS NULL"
             elif not filters.get('assigned') and not filters.get('vacant'):
                 # No checkboxes selected - return empty
                 return [], 0
             
             # Count total
-            count_query = query.replace("SELECT t.id, t.name, t.remaining_battery, cm.name as crew_member_name", "SELECT COUNT(*)")
+            count_query = f"SELECT COUNT(*) as count {from_where} {filter_conditions}"
             curs.execute(count_query, params)
-            total = curs.fetchone()['count']
+            result = curs.fetchone()
+            total = result['count'] if result else 0
             
-            # Add pagination
-            query += " ORDER BY t.remaining_battery ASC LIMIT %s OFFSET %s"
+            # Get data with pagination
+            data_query = f"SELECT {select_fields} {from_where} {filter_conditions} ORDER BY t.remaining_battery ASC LIMIT %s OFFSET %s"
             params.extend([page_size, (page - 1) * page_size])
             
-            curs.execute(query, params)
+            curs.execute(data_query, params)
             items = curs.fetchall()
             
             return items, total
             
         elif table_type == "unassigned_tag_entry":
-            query = """
-                SELECT 
-                    ute.id,
-                    s.name as shipyard_name,
-                    t.name as tag_name,
-                    t.remaining_battery as battery_level,
-                    ute.advertisement_timestamp,
-                    CASE WHEN ute.is_entering THEN 'Ingresso' ELSE 'Uscita' END as entry_type
+            # Base query parts
+            select_fields = """
+                ute.id,
+                s.name as shipyard_name,
+                t.name as tag_name,
+                t.remaining_battery as battery_level,
+                ute.advertisement_timestamp,
+                CASE WHEN ute.is_entering THEN 'Ingresso' ELSE 'Uscita' END as entry_type
+            """
+            
+            from_where = """
                 FROM unassigned_tag_entry ute
                 JOIN tag t ON ute.tag_id = t.id
                 JOIN shipyard s ON ute.shipyard_id = s.id
@@ -219,6 +235,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             """
             
             params = []
+            filter_conditions = ""
             
             # Convert string timestamps to datetime objects if needed
             if filters.get('start_timestamp'):
@@ -228,7 +245,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                         start_ts = datetime.fromisoformat(start_ts.replace('T', ' '))
                     except:
                         start_ts = datetime.now() - timedelta(hours=24)
-                query += " AND ute.advertisement_timestamp >= %s"
+                filter_conditions += " AND ute.advertisement_timestamp >= %s"
                 params.append(start_ts)
             
             if filters.get('end_timestamp'):
@@ -238,43 +255,47 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                         end_ts = datetime.fromisoformat(end_ts.replace('T', ' '))
                     except:
                         end_ts = datetime.now()
-                query += " AND ute.advertisement_timestamp <= %s"
+                filter_conditions += " AND ute.advertisement_timestamp <= %s"
                 params.append(end_ts)
             
             if filters.get('shipyard_id') and filters['shipyard_id'].strip():
-                query += " AND ute.shipyard_id = %s"
+                filter_conditions += " AND ute.shipyard_id = %s"
                 params.append(int(filters['shipyard_id']))
             
             if filters.get('tag_name') and filters['tag_name'].strip():
-                query += " AND t.name = %s"
+                filter_conditions += " AND t.name = %s"
                 params.append(filters['tag_name'].strip())
             
             # Count total
-            count_query = query.replace("SELECT ute.id, s.name as shipyard_name, t.name as tag_name, t.remaining_battery as battery_level, ute.advertisement_timestamp, CASE WHEN ute.is_entering THEN 'Ingresso' ELSE 'Uscita' END as entry_type", "SELECT COUNT(*)")
+            count_query = f"SELECT COUNT(*) as count {from_where} {filter_conditions}"
             curs.execute(count_query, params)
-            total = curs.fetchone()['count']
+            result = curs.fetchone()
+            total = result['count'] if result else 0
             
-            # Add pagination
-            query += " ORDER BY ute.advertisement_timestamp DESC LIMIT %s OFFSET %s"
+            # Get data with pagination
+            data_query = f"SELECT {select_fields} {from_where} {filter_conditions} ORDER BY ute.advertisement_timestamp DESC LIMIT %s OFFSET %s"
             params.extend([page_size, (page - 1) * page_size])
             
-            curs.execute(query, params)
+            curs.execute(data_query, params)
             items = curs.fetchall()
             
             return items, total
             
         elif table_type == "permanence_log":
-            query = """
-                SELECT 
-                    pl.id,
-                    s.name as shipyard_name,
-                    current_tag.name as current_tag_name,
-                    current_tag.remaining_battery as current_battery_level,
-                    ship.name as ship_name,
-                    cm.name as crew_member_name,
-                    cr.role_name,
-                    pl.entry_timestamp,
-                    pl.leave_timestamp
+            # Base query parts
+            select_fields = """
+                pl.id,
+                s.name as shipyard_name,
+                current_tag.name as current_tag_name,
+                current_tag.remaining_battery as current_battery_level,
+                ship.name as ship_name,
+                cm.name as crew_member_name,
+                cr.role_name,
+                pl.entry_timestamp,
+                pl.leave_timestamp
+            """
+            
+            from_where = """
                 FROM permanence_log pl
                 JOIN crew_member cm ON pl.crew_member_id = cm.id
                 JOIN shipyard s ON pl.shipyard_id = s.id
@@ -285,6 +306,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             """
             
             params = []
+            filter_conditions = ""
             
             # Convert string timestamps to datetime objects and apply time filters
             if filters.get('start_timestamp') and filters.get('end_timestamp'):
@@ -303,7 +325,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                     except:
                         end_ts = datetime.now()
                 
-                query += """
+                filter_conditions += """
                     AND (
                         (pl.entry_timestamp <= %s AND (pl.leave_timestamp IS NULL OR pl.leave_timestamp >= %s))
                         OR (pl.entry_timestamp >= %s AND pl.entry_timestamp <= %s)
@@ -312,34 +334,227 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 params.extend([end_ts, start_ts, start_ts, end_ts])
             
             if filters.get('shipyard_id') and filters['shipyard_id'].strip():
-                query += " AND pl.shipyard_id = %s"
+                filter_conditions += " AND pl.shipyard_id = %s"
                 params.append(int(filters['shipyard_id']))
             
             if filters.get('ship_id') and filters['ship_id'].strip():
-                query += " AND cm.ship_id = %s"
+                filter_conditions += " AND cm.ship_id = %s"
                 params.append(int(filters['ship_id']))
             
             if filters.get('crew_name') and filters['crew_name'].strip():
-                query += " AND LOWER(cm.name) LIKE LOWER(%s)"
+                filter_conditions += " AND LOWER(cm.name) LIKE LOWER(%s)"
                 params.append(f"%{filters['crew_name'].strip()}%")
             
             # Count total
-            count_query = query.replace("SELECT pl.id, s.name as shipyard_name, current_tag.name as current_tag_name, current_tag.remaining_battery as current_battery_level, ship.name as ship_name, cm.name as crew_member_name, cr.role_name, pl.entry_timestamp, pl.leave_timestamp", "SELECT COUNT(*)")
-            curs.execute(count_query, params)
-            total = curs.fetchone()['count']
+            count_query = f"SELECT COUNT(*) as count {from_where} {filter_conditions}"
+            try:
+                curs.execute(count_query, params)
+                result = curs.fetchone()
+                total = result['count'] if result else 0
+            except Exception as e:
+                print(f"Error in count query: {e}")
+                print(f"Query: {count_query}")
+                print(f"Params: {params}")
+                total = 0
             
-            # Add pagination
-            query += " ORDER BY cm.name ASC LIMIT %s OFFSET %s"
-            params.extend([page_size, (page - 1) * page_size])
+            # Get data with pagination
+            data_query = f"SELECT {select_fields} {from_where} {filter_conditions} ORDER BY cm.name ASC LIMIT %s OFFSET %s"
+            params_with_pagination = params + [page_size, (page - 1) * page_size]
             
-            curs.execute(query, params)
-            items = curs.fetchall()
+            try:
+                curs.execute(data_query, params_with_pagination)
+                items = curs.fetchall()
+            except Exception as e:
+                print(f"Error in data query: {e}")
+                print(f"Query: {data_query}")
+                print(f"Params: {params_with_pagination}")
+                items = []
             
             return items, total
             
         return [], 0
     
     return fetch_data()
+
+# ===== HTMX TABLE CONFIG HELPER =====
+
+def create_table_config(table_type, filters, page, request_path):
+    """Helper function to create table configuration for both full and partial requests"""
+    data, total_count = get_filtered_data(table_type, filters, page)
+    
+    if table_type == "crew_member":
+        return {
+            "title": "Gestione Crew",
+            "description": "Visualizza e gestisci i membri dell'equipaggio",
+            "columns": [
+                {"key": "tag_name", "label": "Tag", "type": "text"},
+                {"key": "battery_level", "label": "🔋%", "type": "battery"},
+                {"key": "ship_name", "label": "Nave", "type": "text"},
+                {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
+                {"key": "role_name", "label": "Ruolo", "type": "text"}
+            ],
+            "text_filters": [
+                {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
+            ],
+            "searchable_select_filters": [
+                {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"},
+                {"key": "role_id", "label": "Ruolo", "placeholder": "Cerca ruolo...", "search_endpoint": "/api/roles/filter"}
+            ],
+            "allow_add": True,
+            "allow_edit": True,
+            "allow_delete": True,
+            "add_button_text": "Aggiungi Crew",
+            "empty_message": "Applica dei filtri per visualizzare i membri dell'equipaggio.",
+            "add_url": "/crew/add",
+            "edit_url": "/crew/edit/{id}",
+            "delete_url": "/api/crew/delete/{id}",
+            "data": data,
+            "total_count": total_count,
+            "page": page
+        }
+    
+    elif table_type == "ship":
+        return {
+            "title": "Gestione Navi",
+            "description": "Visualizza e gestisci le navi",
+            "columns": [
+                {"key": "name", "label": "Nave", "type": "text"}
+            ],
+            "text_filters": [
+                {"key": "ship_name", "label": "Nome Nave", "placeholder": "Cerca per nome..."}
+            ],
+            "allow_add": True,
+            "allow_edit": True,
+            "allow_delete": True,
+            "add_button_text": "Aggiungi Nave",
+            "empty_message": "Nessuna nave trovata.",
+            "add_url": "/navi/add",
+            "edit_url": "/navi/edit/{id}",
+            "delete_url": "/api/ships/delete/{id}",
+            "data": data,
+            "total_count": total_count,
+            "page": page
+        }
+    
+    elif table_type == "tag":
+        return {
+            "title": "Gestione Tag",
+            "description": "Visualizza e gestisci i tag",
+            "columns": [
+                {"key": "name", "label": "Tag", "type": "text"},
+                {"key": "remaining_battery", "label": "🔋%", "type": "battery"},
+                {"key": "crew_member_name", "label": "Equipaggio", "type": "text"}
+            ],
+            "checkbox_filters": [
+                {"key": "assigned", "label": "Assegnati"},
+                {"key": "vacant", "label": "Vacanti"}
+            ],
+            "allow_add": True,
+            "allow_edit": True,
+            "allow_delete": True,
+            "add_button_text": "Aggiungi Tag",
+            "empty_message": "Seleziona almeno un filtro per visualizzare i tag.",
+            "add_url": "/tag/add",
+            "edit_url": "/tag/edit/{id}",
+            "delete_url": "/api/tags/delete/{id}",
+            "data": data,
+            "total_count": total_count,
+            "page": page
+        }
+    
+    elif table_type == "unassigned_tag_entry":
+        return {
+            "title": "Log Entrate",
+            "description": "Visualizza le entrate di tag non assegnati",
+            "columns": [
+                {"key": "shipyard_name", "label": "Cantiere", "type": "text"},
+                {"key": "tag_name", "label": "Tag", "type": "text"},
+                {"key": "battery_level", "label": "🔋%", "type": "battery"},
+                {"key": "advertisement_timestamp", "label": "Passaggio", "type": "datetime"},
+                {"key": "entry_type", "label": "Tipologia", "type": "text"}
+            ],
+            "date_filters": [
+                {
+                    "key": "start_timestamp", 
+                    "label": "Data Inizio",
+                    "default_value": (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M')
+                },
+                {
+                    "key": "end_timestamp", 
+                    "label": "Data Fine",
+                    "default_value": datetime.now().strftime('%Y-%m-%dT%H:%M')
+                }
+            ],
+            "searchable_select_filters": [
+                {"key": "shipyard_id", "label": "Cantiere", "placeholder": "Cerca cantiere...", "search_endpoint": "/api/shipyards/filter"}
+            ],
+            "text_filters": [
+                {"key": "tag_name", "label": "Nome Tag", "placeholder": "Cerca tag esatto..."}
+            ],
+            "allow_add": False,
+            "allow_edit": False,
+            "allow_delete": True,
+            "empty_message": "Nessuna entrata trovata nel periodo selezionato.",
+            "delete_url": "/api/entries/delete/{id}",
+            "data": data,
+            "total_count": total_count,
+            "page": page
+        }
+    
+    elif table_type == "permanence_log":
+        return {
+            "title": "Log Permanenze",
+            "description": "Visualizza i log di permanenza nei cantieri",
+            "columns": [
+                {"key": "shipyard_name", "label": "Cantiere", "type": "text"},
+                {"key": "current_tag_name", "label": "Tag", "type": "text"},
+                {"key": "current_battery_level", "label": "🔋%", "type": "battery"},
+                {"key": "ship_name", "label": "Nave", "type": "text"},
+                {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
+                {"key": "role_name", "label": "Ruolo", "type": "text"},
+                {"key": "entry_timestamp", "label": "Entrata", "type": "datetime"},
+                {"key": "leave_timestamp", "label": "Uscita", "type": "datetime"}
+            ],
+            "date_filters": [
+                {
+                    "key": "start_timestamp", 
+                    "label": "Data Inizio",
+                    "default_value": (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M')
+                },
+                {
+                    "key": "end_timestamp", 
+                    "label": "Data Fine",
+                    "default_value": datetime.now().strftime('%Y-%m-%dT%H:%M')
+                }
+            ],
+            "searchable_select_filters": [
+                {"key": "shipyard_id", "label": "Cantiere", "placeholder": "Cerca cantiere...", "search_endpoint": "/api/shipyards/filter"},
+                {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"}
+            ],
+            "text_filters": [
+                {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
+            ],
+            "allow_add": True,
+            "allow_edit": True,
+            "allow_delete": True,
+            "add_button_text": "Aggiungi Log",
+            "empty_message": "Nessun log trovato nel periodo selezionato.",
+            "add_url": "/log/add",
+            "edit_url": "/log/edit/{id}",
+            "delete_url": "/api/logs/delete/{id}",
+            "data": data,
+            "total_count": total_count,
+            "page": page
+        }
+
+    return {
+        "title": "Unknown Table",
+        "description": "",
+        "columns": [],
+        "data": data,
+        "total_count": total_count,
+        "page": page
+    }
 
 # ===== MAIN ROUTES =====
 
@@ -379,9 +594,10 @@ def logout():
     session.clear()
     return redirect("/login")
 
-# ===== CREW MEMBERS ROUTES =====
+# ===== CREW MEMBERS ROUTES WITH HTMX =====
 
 @app.route('/crew')
+@app.route('/crew/partial')
 @auth_required
 def crew_page():
     # Get filters from URL parameters
@@ -395,41 +611,16 @@ def crew_page():
     page = int(request.args.get('page', 1))
     
     try:
-        data, total_count = get_filtered_data("crew_member", filters, page)
+        table_config = create_table_config("crew_member", filters, page, request.path)
     except Exception as e:
         print(f"Error in crew_page: {e}")
-        data, total_count = [], 0
+        table_config = create_table_config("crew_member", {}, 1, request.path)
     
-    table_config = {
-        "title": "Gestione Crew",
-        "description": "Visualizza e gestisci i membri dell'equipaggio",
-        "columns": [
-            {"key": "tag_name", "label": "Tag", "type": "text"},
-            {"key": "battery_level", "label": "🔋%", "type": "battery"},
-            {"key": "ship_name", "label": "Nave", "type": "text"},
-            {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
-            {"key": "role_name", "label": "Ruolo", "type": "text"}
-        ],
-        "text_filters": [
-            {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
-        ],
-        "searchable_select_filters": [
-            {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"},
-            {"key": "role_id", "label": "Ruolo", "placeholder": "Cerca ruolo...", "search_endpoint": "/api/roles/filter"}
-        ],
-        "allow_add": True,
-        "allow_edit": True,
-        "allow_delete": True,
-        "add_button_text": "Aggiungi Crew",
-        "empty_message": "Applica dei filtri per visualizzare i membri dell'equipaggio.",
-        "add_url": "/crew/add",
-        "edit_url": "/crew/edit/{id}",
-        "delete_url": "/api/crew/delete/{id}",
-        "data": data,
-        "total_count": total_count,
-        "page": page
-    }
+    # Return partial template for HTMX requests
+    if request.path.endswith('/partial'):
+        return render_template('table_content_partial.html', table_config=table_config)
     
+    # Return full page for regular requests
     return render_template('crew.html', table_config=table_config)
 
 @app.route('/crew/add', methods=['GET', 'POST'])
@@ -523,9 +714,10 @@ def delete_crew(curs, crew_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ===== SHIPS ROUTES =====
+# ===== SHIPS ROUTES WITH HTMX =====
 
 @app.route('/navi')
+@app.route('/navi/partial')
 @auth_required
 def ships_page():
     # Get filters from URL parameters
@@ -536,33 +728,16 @@ def ships_page():
     page = int(request.args.get('page', 1))
     
     try:
-        data, total_count = get_filtered_data("ship", filters, page)
+        table_config = create_table_config("ship", filters, page, request.path)
     except Exception as e:
         print(f"Error in ships_page: {e}")
-        data, total_count = [], 0
+        table_config = create_table_config("ship", {}, 1, request.path)
     
-    table_config = {
-        "title": "Gestione Navi",
-        "description": "Visualizza e gestisci le navi",
-        "columns": [
-            {"key": "name", "label": "Nave", "type": "text"}
-        ],
-        "text_filters": [
-            {"key": "ship_name", "label": "Nome Nave", "placeholder": "Cerca per nome..."}
-        ],
-        "allow_add": True,
-        "allow_edit": True,
-        "allow_delete": True,
-        "add_button_text": "Aggiungi Nave",
-        "empty_message": "Nessuna nave trovata.",
-        "add_url": "/navi/add",
-        "edit_url": "/navi/edit/{id}",
-        "delete_url": "/api/ships/delete/{id}",
-        "data": data,
-        "total_count": total_count,
-        "page": page
-    }
+    # Return partial template for HTMX requests
+    if request.path.endswith('/partial'):
+        return render_template('table_content_partial.html', table_config=table_config)
     
+    # Return full page for regular requests
     return render_template('ships.html', table_config=table_config)
 
 @app.route('/navi/add', methods=['GET', 'POST'])
@@ -636,9 +811,10 @@ def delete_ship(curs, ship_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ===== TAGS ROUTES =====
+# ===== TAGS ROUTES WITH HTMX =====
 
 @app.route('/tag')
+@app.route('/tag/partial')
 @auth_required
 def tags_page():
     # Get filters from URL parameters
@@ -650,36 +826,16 @@ def tags_page():
     page = int(request.args.get('page', 1))
     
     try:
-        data, total_count = get_filtered_data("tag", filters, page)
+        table_config = create_table_config("tag", filters, page, request.path)
     except Exception as e:
         print(f"Error in tags_page: {e}")
-        data, total_count = [], 0
+        table_config = create_table_config("tag", {}, 1, request.path)
     
-    table_config = {
-        "title": "Gestione Tag",
-        "description": "Visualizza e gestisci i tag",
-        "columns": [
-            {"key": "name", "label": "Tag", "type": "text"},
-            {"key": "remaining_battery", "label": "🔋%", "type": "battery"},
-            {"key": "crew_member_name", "label": "Equipaggio", "type": "text"}
-        ],
-        "checkbox_filters": [
-            {"key": "assigned", "label": "Assegnati"},
-            {"key": "vacant", "label": "Vacanti"}
-        ],
-        "allow_add": True,
-        "allow_edit": True,
-        "allow_delete": True,
-        "add_button_text": "Aggiungi Tag",
-        "empty_message": "Seleziona almeno un filtro per visualizzare i tag.",
-        "add_url": "/tag/add",
-        "edit_url": "/tag/edit/{id}",
-        "delete_url": "/api/tags/delete/{id}",
-        "data": data,
-        "total_count": total_count,
-        "page": page
-    }
+    # Return partial template for HTMX requests
+    if request.path.endswith('/partial'):
+        return render_template('table_content_partial.html', table_config=table_config)
     
+    # Return full page for regular requests
     return render_template('tags.html', table_config=table_config)
 
 @app.route('/tag/add', methods=['GET', 'POST'])
@@ -781,9 +937,10 @@ def delete_tag(curs, tag_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ===== ENTRIES ROUTES =====
+# ===== ENTRIES ROUTES WITH HTMX =====
 
 @app.route('/entry')
+@app.route('/entry/partial')
 @auth_required
 def entries_page():
     # Default to last 24 hours if no dates specified
@@ -801,49 +958,16 @@ def entries_page():
     page = int(request.args.get('page', 1))
     
     try:
-        data, total_count = get_filtered_data("unassigned_tag_entry", filters, page)
+        table_config = create_table_config("unassigned_tag_entry", filters, page, request.path)
     except Exception as e:
         print(f"Error in entries_page: {e}")
-        data, total_count = [], 0
+        table_config = create_table_config("unassigned_tag_entry", {}, 1, request.path)
     
-    table_config = {
-        "title": "Log Entrate",
-        "description": "Visualizza le entrate di tag non assegnati",
-        "columns": [
-            {"key": "shipyard_name", "label": "Cantiere", "type": "text"},
-            {"key": "tag_name", "label": "Tag", "type": "text"},
-            {"key": "battery_level", "label": "🔋%", "type": "battery"},
-            {"key": "advertisement_timestamp", "label": "Passaggio", "type": "datetime"},
-            {"key": "entry_type", "label": "Tipologia", "type": "text"}
-        ],
-        "date_filters": [
-            {
-                "key": "start_timestamp", 
-                "label": "Data Inizio",
-                "default_value": yesterday.strftime('%Y-%m-%dT%H:%M')
-            },
-            {
-                "key": "end_timestamp", 
-                "label": "Data Fine",
-                "default_value": now.strftime('%Y-%m-%dT%H:%M')
-            }
-        ],
-        "searchable_select_filters": [
-            {"key": "shipyard_id", "label": "Cantiere", "placeholder": "Cerca cantiere...", "search_endpoint": "/api/shipyards/filter"}
-        ],
-        "text_filters": [
-            {"key": "tag_name", "label": "Nome Tag", "placeholder": "Cerca tag esatto..."}
-        ],
-        "allow_add": False,
-        "allow_edit": False,
-        "allow_delete": True,
-        "empty_message": "Nessuna entrata trovata nel periodo selezionato.",
-        "delete_url": "/api/entries/delete/{id}",
-        "data": data,
-        "total_count": total_count,
-        "page": page
-    }
+    # Return partial template for HTMX requests
+    if request.path.endswith('/partial'):
+        return render_template('table_content_partial.html', table_config=table_config)
     
+    # Return full page for regular requests
     return render_template('entries.html', table_config=table_config)
 
 @app.route('/api/entries/delete/<int:entry_id>', methods=['DELETE'])
@@ -856,9 +980,10 @@ def delete_entry(curs, entry_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ===== LOGS ROUTES =====
+# ===== LOGS ROUTES WITH HTMX =====
 
 @app.route('/log')
+@app.route('/log/partial')
 @auth_required
 def logs_page():
     # Default to last 24 hours if no dates specified
@@ -877,56 +1002,16 @@ def logs_page():
     page = int(request.args.get('page', 1))
     
     try:
-        data, total_count = get_filtered_data("permanence_log", filters, page)
+        table_config = create_table_config("permanence_log", filters, page, request.path)
     except Exception as e:
         print(f"Error in logs_page: {e}")
-        data, total_count = [], 0
+        table_config = create_table_config("permanence_log", {}, 1, request.path)
     
-    table_config = {
-        "title": "Log Permanenze",
-        "description": "Visualizza i log di permanenza nei cantieri",
-        "columns": [
-            {"key": "shipyard_name", "label": "Cantiere", "type": "text"},
-            {"key": "current_tag_name", "label": "Tag", "type": "text"},
-            {"key": "current_battery_level", "label": "🔋%", "type": "battery"},
-            {"key": "ship_name", "label": "Nave", "type": "text"},
-            {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
-            {"key": "role_name", "label": "Ruolo", "type": "text"},
-            {"key": "entry_timestamp", "label": "Entrata", "type": "datetime"},
-            {"key": "leave_timestamp", "label": "Uscita", "type": "datetime"}
-        ],
-        "date_filters": [
-            {
-                "key": "start_timestamp", 
-                "label": "Data Inizio",
-                "default_value": yesterday.strftime('%Y-%m-%dT%H:%M')
-            },
-            {
-                "key": "end_timestamp", 
-                "label": "Data Fine",
-                "default_value": now.strftime('%Y-%m-%dT%H:%M')
-            }
-        ],
-        "searchable_select_filters": [
-            {"key": "shipyard_id", "label": "Cantiere", "placeholder": "Cerca cantiere...", "search_endpoint": "/api/shipyards/filter"},
-            {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"}
-        ],
-        "text_filters": [
-            {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
-        ],
-        "allow_add": True,
-        "allow_edit": True,
-        "allow_delete": True,
-        "add_button_text": "Aggiungi Log",
-        "empty_message": "Nessun log trovato nel periodo selezionato.",
-        "add_url": "/log/add",
-        "edit_url": "/log/edit/{id}",
-        "delete_url": "/api/logs/delete/{id}",
-        "data": data,
-        "total_count": total_count,
-        "page": page
-    }
+    # Return partial template for HTMX requests
+    if request.path.endswith('/partial'):
+        return render_template('table_content_partial.html', table_config=table_config)
     
+    # Return full page for regular requests
     return render_template('logs.html', table_config=table_config)
 
 @app.route('/log/add', methods=['GET', 'POST'])

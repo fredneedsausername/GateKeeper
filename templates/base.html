@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GateKeeper</title>
     <script defer src="{{url_for('static', filename='alpine.min.js')}}"></script>
+    <!-- Add HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
         * {
             margin: 0;
@@ -18,6 +20,44 @@
         
         [x-cloak] {
             display: none !important;
+        }
+        
+        /* HTMX Loading Indicator */
+        .htmx-loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        .htmx-loading-indicator {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        
+        .htmx-loading-indicator.htmx-request {
+            display: block;
+        }
+        
+        .htmx-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #2563eb;
+            border-radius: 50%;
+            animation: htmx-spin 1s linear infinite;
+            margin: 0 auto 8px auto;
+        }
+        
+        @keyframes htmx-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         body {
@@ -342,6 +382,7 @@
             border-radius: 8px;
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
             overflow: hidden;
+            position: relative;
         }
 
         /* Base Header Section */
@@ -862,6 +903,12 @@
     </style>
 </head>
 <body x-data="sidebarState()" @click.away="baseDropdownOpen = false">
+    <!-- Global HTMX Loading Indicator -->
+    <div class="htmx-loading-indicator htmx-indicator">
+        <div class="htmx-spinner"></div>
+        <div style="text-align: center; color: #6b7280; font-size: 14px;">Caricamento...</div>
+    </div>
+
     <!-- Header -->
     <header class="base-header">
         <div class="base-header-content">
@@ -1012,6 +1059,29 @@
                 }
             }
         }
+
+        // HTMX Configuration and Event Listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add loading class during HTMX requests
+            document.body.addEventListener('htmx:beforeRequest', function(evt) {
+                if (evt.detail.target.closest('.base-table-container')) {
+                    evt.detail.target.classList.add('htmx-loading');
+                }
+            });
+
+            // Remove loading class after HTMX requests
+            document.body.addEventListener('htmx:afterRequest', function(evt) {
+                if (evt.detail.target.closest('.base-table-container')) {
+                    evt.detail.target.classList.remove('htmx-loading');
+                }
+            });
+
+            // Handle HTMX errors
+            document.body.addEventListener('htmx:responseError', function(evt) {
+                console.error('HTMX Error:', evt.detail);
+                // Optionally show user-friendly error message
+            });
+        });
     </script>
 </body>
 </html>
