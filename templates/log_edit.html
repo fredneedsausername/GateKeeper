@@ -84,10 +84,8 @@ function logEditForm(existingData) {
         },
         
         async searchCrewMembers() {
-            if (this.crewSearch.length < 2) {
-                this.crewMembers = [];
-                return;
-            }
+            // Remove the length check - search immediately with any input
+            const query = this.crewSearch.trim();
             
             try {
                 const response = await fetch('/api/crew/search', {
@@ -95,13 +93,14 @@ function logEditForm(existingData) {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: this.crewSearch })
+                    body: JSON.stringify({ query: query })
                 });
                 
                 const data = await response.json();
                 this.crewMembers = data.crew_members || [];
             } catch (error) {
                 console.error('Crew search error:', error);
+                this.crewMembers = [];
             }
         }
     }

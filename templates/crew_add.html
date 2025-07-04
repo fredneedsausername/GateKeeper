@@ -81,10 +81,8 @@ function crewForm() {
         tags: [],
         
         async searchShips() {
-            if (this.shipSearch.length < 2) {
-                this.ships = [];
-                return;
-            }
+            // Remove the length check - search immediately with any input
+            const query = this.shipSearch.trim();
             
             try {
                 const response = await fetch('/api/ships/search', {
@@ -92,21 +90,20 @@ function crewForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: this.shipSearch })
+                    body: JSON.stringify({ query: query })
                 });
                 
                 const data = await response.json();
                 this.ships = data.ships || [];
             } catch (error) {
                 console.error('Ship search error:', error);
+                this.ships = [];
             }
         },
         
         async searchRoles() {
-            if (this.roleSearch.length < 2) {
-                this.roles = [];
-                return;
-            }
+            // Remove the length check - search immediately with any input
+            const query = this.roleSearch.trim();
             
             try {
                 const response = await fetch('/api/roles/search', {
@@ -114,21 +111,20 @@ function crewForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: this.roleSearch })
+                    body: JSON.stringify({ query: query })
                 });
                 
                 const data = await response.json();
                 this.roles = data.roles || [];
             } catch (error) {
                 console.error('Role search error:', error);
+                this.roles = [];
             }
         },
         
         async searchTags() {
-            if (this.tagSearch.length < 2) {
-                this.tags = [];
-                return;
-            }
+            // Remove the length check - search immediately with any input
+            const query = this.tagSearch.trim();
             
             try {
                 const response = await fetch('/api/tags/search', {
@@ -136,13 +132,14 @@ function crewForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: this.tagSearch })
+                    body: JSON.stringify({ query: query })
                 });
                 
                 const data = await response.json();
                 this.tags = data.tags || [];
             } catch (error) {
                 console.error('Tag search error:', error);
+                this.tags = [];
             }
         }
     }

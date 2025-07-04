@@ -217,7 +217,7 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
                     if (selectedOption) {
                         this.searchText = selectedOption.label;
                         // Only set options if we actually need to show the dropdown
-                        if (this.searchText.length >= 2) {
+                        if (this.searchText.length >= 1) {
                             this.options = data.options;
                         }
                     }
@@ -230,10 +230,8 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
         },
         
         async searchOptions() {
-            if (this.searchText.length < 2) {
-                this.options = [];
-                return;
-            }
+            // Remove the length check - search immediately with any input
+            const query = this.searchText.trim();
             
             this.isLoading = true;
             try {
@@ -242,7 +240,7 @@ function searchableFilter(filterKey, searchEndpoint, initialValue) {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: this.searchText })
+                    body: JSON.stringify({ query: query })
                 });
                 
                 const data = await response.json();

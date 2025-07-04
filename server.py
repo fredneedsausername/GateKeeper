@@ -1120,9 +1120,7 @@ def search_ships(curs):
     data = request.get_json()
     query = data.get('query', '').strip()
     
-    if len(query) < 2:
-        return jsonify({"ships": []})
-    
+    # Remove the 2-character minimum requirement
     curs.execute(
         "SELECT id, name FROM ship WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
         [f"%{query}%"]
@@ -1138,9 +1136,7 @@ def search_roles(curs):
     data = request.get_json()
     query = data.get('query', '').strip()
     
-    if len(query) < 2:
-        return jsonify({"roles": []})
-    
+    # Remove the 2-character minimum requirement
     curs.execute(
         "SELECT id, role_name FROM crew_member_roles WHERE LOWER(role_name) LIKE LOWER(%s) ORDER BY role_name LIMIT 10",
         [f"%{query}%"]
@@ -1156,9 +1152,7 @@ def search_tags(curs):
     data = request.get_json()
     query = data.get('query', '').strip()
     
-    if len(query) < 2:
-        return jsonify({"tags": []})
-    
+    # Remove the 2-character minimum requirement
     curs.execute(
         """SELECT t.id, t.name 
            FROM tag t 
@@ -1178,9 +1172,7 @@ def search_crew(curs):
     data = request.get_json()
     query = data.get('query', '').strip()
     
-    if len(query) < 2:
-        return jsonify({"crew_members": []})
-    
+    # Remove the 2-character minimum requirement
     curs.execute(
         "SELECT id, name FROM crew_member WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
         [f"%{query}%"]
@@ -1196,9 +1188,7 @@ def search_shipyards(curs):
     data = request.get_json()
     query = data.get('query', '').strip()
     
-    if len(query) < 2:
-        return jsonify({"shipyards": []})
-    
+    # Remove the 2-character minimum requirement
     curs.execute(
         "SELECT id, name FROM shipyard WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
         [f"%{query}%"]
@@ -1225,9 +1215,7 @@ def filter_ships(curs):
             return jsonify({"options": [{"value": ship["id"], "label": ship["name"]}]})
         return jsonify({"options": []})
     
-    if len(query) < 2:
-        return jsonify({"options": []})
-    
+    # Remove the 2-character minimum requirement
     curs.execute(
         "SELECT id, name FROM ship WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
         [f"%{query}%"]
@@ -1253,9 +1241,7 @@ def filter_roles(curs):
             return jsonify({"options": [{"value": role["id"], "label": role["role_name"]}]})
         return jsonify({"options": []})
     
-    if len(query) < 2:
-        return jsonify({"options": []})
-    
+    # Remove the 2-character minimum requirement
     curs.execute(
         "SELECT id, role_name FROM crew_member_roles WHERE LOWER(role_name) LIKE LOWER(%s) ORDER BY role_name LIMIT 10",
         [f"%{query}%"]
@@ -1281,9 +1267,7 @@ def filter_shipyards(curs):
             return jsonify({"options": [{"value": shipyard["id"], "label": shipyard["name"]}]})
         return jsonify({"options": []})
     
-    if len(query) < 2:
-        return jsonify({"options": []})
-    
+    # Remove the 2-character minimum requirement
     curs.execute(
         "SELECT id, name FROM shipyard WHERE LOWER(name) LIKE LOWER(%s) ORDER BY name LIMIT 10",
         [f"%{query}%"]
