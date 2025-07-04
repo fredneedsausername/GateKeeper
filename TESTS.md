@@ -26,6 +26,7 @@
 - Can create succesfully
 - Can cancel creation successfully
 - Well put "no results found" page
+- Every single textbox area can't exceed the limit imposed by the database
 
 For:
 
