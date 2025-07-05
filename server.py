@@ -563,31 +563,28 @@ def create_table_config(table_type, filters, page, request_path):
 def index():
     return redirect("/log")
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "GET":
-        return render_template("login.html")
+@app.route("/login", methods=["GET"])
+def login_get():
+    return render_template("login.html")
 
-    if request.method == "POST":
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        
-        @connected_to_database
-        def fetch_username(curs):
-            curs.execute("SELECT username FROM users WHERE password=%s", (password,))
-            return curs.fetchone()
-
-        if fetch_username():
-            session["user"] = username
-            return jsonify({
-                "message": "Login effettuato con successo",
-                "redirect": "/"
-            }), 200
-        else:
-            return jsonify({
-                "error": "Credenziali incorrette"
-            }), 401
+@app.route("/login", methods=["POST"])
+@connected_to_database
+def login_post(curs):
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    curs.execute("SELECT username FROM users WHERE username=%s AND password=%s", (username, password))
+    user = curs.fetchone()
+    if user:
+        session["user"] = username
+        return jsonify({
+            "message": "Login effettuato con successo",
+            "redirect": "/"
+        }), 200
+    else:
+        return jsonify({
+            "error": "Credenziali incorrette"
+        }), 401
 
 @app.route("/logout")
 def logout():
@@ -625,83 +622,64 @@ def crew_page():
 
 @app.route('/crew/add', methods=['GET', 'POST'])
 @auth_required
-def add_crew():
+@connected_to_database
+def add_crew(curs):
     if request.method == 'POST':
         try:
             name = request.form.get('name')
             ship_id = request.form.get('ship_id') or None
             role_id = request.form.get('role_id') or None
             tag_id = request.form.get('tag_id') or None
-            
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
-            
-            @connected_to_database
-            def insert_crew(curs):
-                curs.execute(
-                    "INSERT INTO crew_member (name, ship_id, role_id, tag_id) VALUES (%s, %s, %s, %s)",
-                    [name, ship_id, role_id, tag_id]
-                )
-            
-            insert_crew()
+            curs.execute(
+                "INSERT INTO crew_member (name, ship_id, role_id, tag_id) VALUES (%s, %s, %s, %s)",
+                [name, ship_id, role_id, tag_id]
+            )
             flash('Crew member aggiunto con successo', 'success')
             return redirect('/crew')
-            
         except Exception as e:
             flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
             return redirect(request.url)
-    
     return render_template('crew_add.html')
 
 @app.route('/crew/edit/<int:crew_id>', methods=['GET', 'POST'])
 @auth_required
-def edit_crew(crew_id):
+@connected_to_database
+def edit_crew(curs, crew_id):
     if request.method == 'POST':
         try:
             name = request.form.get('name')
             ship_id = request.form.get('ship_id') or None
             role_id = request.form.get('role_id') or None
             tag_id = request.form.get('tag_id') or None
-            
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
-            
-            @connected_to_database
-            def update_crew(curs):
-                curs.execute(
-                    "UPDATE crew_member SET name = %s, ship_id = %s, role_id = %s, tag_id = %s WHERE id = %s",
-                    [name, ship_id, role_id, tag_id, crew_id]
-                )
-            
-            update_crew()
+            curs.execute(
+                "UPDATE crew_member SET name = %s, ship_id = %s, role_id = %s, tag_id = %s WHERE id = %s",
+                [name, ship_id, role_id, tag_id, crew_id]
+            )
             flash('Crew member aggiornato con successo', 'success')
             return redirect('/crew')
-            
         except Exception as e:
             flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
             return redirect(request.url)
-    
-    @connected_to_database
-    def get_crew_member(curs):
-        curs.execute(
-            """SELECT cm.*, s.name as ship_name, cr.role_name, t.name as tag_name
-               FROM crew_member cm
-               LEFT JOIN ship s ON cm.ship_id = s.id
-               LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
-               LEFT JOIN tag t ON cm.tag_id = t.id
-               WHERE cm.id = %s""",
-            [crew_id]
-        )
-        return curs.fetchone()
-    
-    crew_member = get_crew_member()
-    
+    # GET request
+    curs.execute(
+        """SELECT cm.*, s.name as ship_name, cr.role_name, t.name as tag_name
+           FROM crew_member cm
+           LEFT JOIN ship s ON cm.ship_id = s.id
+           LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
+           LEFT JOIN tag t ON cm.tag_id = t.id
+           WHERE cm.id = %s""",
+        [crew_id]
+    )
+    crew_member = curs.fetchone()
     if not crew_member:
         flash('Crew member non trovato', 'error')
         return redirect('/crew')
-    
     return render_template('crew_edit.html', crew_member=crew_member)
 
 @app.route('/api/crew/delete/<int:crew_id>', methods=['DELETE'])
@@ -742,63 +720,44 @@ def ships_page():
 
 @app.route('/navi/add', methods=['GET', 'POST'])
 @auth_required
-def add_ship():
+@connected_to_database
+def add_ship(curs):
     if request.method == 'POST':
         try:
             name = request.form.get('name')
-            
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
-            
-            @connected_to_database
-            def insert_ship(curs):
-                curs.execute("INSERT INTO ship (name) VALUES (%s)", [name])
-            
-            insert_ship()
+            curs.execute("INSERT INTO ship (name) VALUES (%s)", [name])
             flash('Nave aggiunta con successo', 'success')
             return redirect('/navi')
-            
         except Exception as e:
             flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
             return redirect(request.url)
-    
     return render_template('ship_add.html')
 
 @app.route('/navi/edit/<int:ship_id>', methods=['GET', 'POST'])
 @auth_required
-def edit_ship(ship_id):
+@connected_to_database
+def edit_ship(curs, ship_id):
     if request.method == 'POST':
         try:
             name = request.form.get('name')
-            
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
-            
-            @connected_to_database
-            def update_ship(curs):
-                curs.execute("UPDATE ship SET name = %s WHERE id = %s", [name, ship_id])
-            
-            update_ship()
+            curs.execute("UPDATE ship SET name = %s WHERE id = %s", [name, ship_id])
             flash('Nave aggiornata con successo', 'success')
             return redirect('/navi')
-            
         except Exception as e:
             flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
             return redirect(request.url)
-    
-    @connected_to_database
-    def get_ship(curs):
-        curs.execute("SELECT * FROM ship WHERE id = %s", [ship_id])
-        return curs.fetchone()
-    
-    ship = get_ship()
-    
+    # GET request
+    curs.execute("SELECT * FROM ship WHERE id = %s", [ship_id])
+    ship = curs.fetchone()
     if not ship:
         flash('Nave non trovata', 'error')
         return redirect('/navi')
-    
     return render_template('ship_edit.html', ship=ship)
 
 @app.route('/api/ships/delete/<int:ship_id>', methods=['DELETE'])
@@ -840,7 +799,8 @@ def tags_page():
 
 @app.route('/tag/add', methods=['GET', 'POST'])
 @auth_required
-def add_tag():
+@connected_to_database
+def add_tag(curs):
     if request.method == 'POST':
         try:
             name = request.form.get('name')
@@ -849,35 +809,25 @@ def add_tag():
             if not name:
                 flash('Nome tag è obbligatorio', 'error')
                 return redirect(request.url)
-            
-            @connected_to_database
-            def insert_tag(curs):
-                # Insert tag
-                curs.execute("INSERT INTO tag (name, remaining_battery, packet_counter) VALUES (%s, %s, %s)", 
-                           [name, 100.0, 0])
-                
-                # Get the new tag ID
-                curs.execute("SELECT id FROM tag WHERE name = %s ORDER BY id DESC LIMIT 1", [name])
-                tag_id = curs.fetchone()['id']
-                
-                # If crew member selected, assign tag to them
-                if crew_member_id:
-                    curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", 
-                               [tag_id, crew_member_id])
-            
-            insert_tag()
+            # Insert tag
+            curs.execute("INSERT INTO tag (name, remaining_battery, packet_counter) VALUES (%s, %s, %s)", [name, 100.0, 0])
+            # Get the new tag ID
+            curs.execute("SELECT id FROM tag WHERE name = %s ORDER BY id DESC LIMIT 1", [name])
+            tag_id = curs.fetchone()['id']
+            # If crew member selected, assign tag to them
+            if crew_member_id:
+                curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", [tag_id, crew_member_id])
             flash('Tag aggiunto con successo', 'success')
             return redirect('/tag')
-            
         except Exception as e:
             flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
             return redirect(request.url)
-    
     return render_template('tag_add.html')
 
 @app.route('/tag/edit/<int:tag_id>', methods=['GET', 'POST'])
 @auth_required
-def edit_tag(tag_id):
+@connected_to_database
+def edit_tag(curs, tag_id):
     if request.method == 'POST':
         try:
             name = request.form.get('name')
@@ -887,44 +837,30 @@ def edit_tag(tag_id):
                 flash('Nome tag è obbligatorio', 'error')
                 return redirect(request.url)
             
-            @connected_to_database
-            def update_tag(curs):
-                # Update tag name
-                curs.execute("UPDATE tag SET name = %s WHERE id = %s", [name, tag_id])
-                
-                # Remove tag from current crew member
-                curs.execute("UPDATE crew_member SET tag_id = NULL WHERE tag_id = %s", [tag_id])
-                
-                # Assign to new crew member if selected
-                if crew_member_id:
-                    curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", 
-                               [tag_id, crew_member_id])
-            
-            update_tag()
+            # Update tag name
+            curs.execute("UPDATE tag SET name = %s WHERE id = %s", [name, tag_id])
+            # Remove tag from current crew member
+            curs.execute("UPDATE crew_member SET tag_id = NULL WHERE tag_id = %s", [tag_id])
+            # Assign to new crew member if selected
+            if crew_member_id:
+                curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", [tag_id, crew_member_id])
             flash('Tag aggiornato con successo', 'success')
             return redirect('/tag')
-            
         except Exception as e:
             flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
             return redirect(request.url)
-    
-    @connected_to_database
-    def get_tag(curs):
-        curs.execute(
-            """SELECT t.*, cm.name as crew_member_name, cm.id as crew_member_id
-               FROM tag t
-               LEFT JOIN crew_member cm ON t.id = cm.tag_id
-               WHERE t.id = %s""",
-            [tag_id]
-        )
-        return curs.fetchone()
-    
-    tag = get_tag()
-    
+    # GET request
+    curs.execute(
+        """SELECT t.*, cm.name as crew_member_name, cm.id as crew_member_id
+           FROM tag t
+           LEFT JOIN crew_member cm ON t.id = cm.tag_id
+           WHERE t.id = %s""",
+        [tag_id]
+    )
+    tag = curs.fetchone()
     if not tag:
         flash('Tag non trovato', 'error')
         return redirect('/tag')
-    
     return render_template('tag_edit.html', tag=tag)
 
 @app.route('/api/tags/delete/<int:tag_id>', methods=['DELETE'])
@@ -1016,89 +952,68 @@ def logs_page():
 
 @app.route('/log/add', methods=['GET', 'POST'])
 @auth_required
-def add_log():
+@connected_to_database
+def add_log(curs):
     if request.method == 'POST':
         try:
             crew_member_id = request.form.get('crew_member_id')
             shipyard_id = request.form.get('shipyard_id')
             entry_timestamp = request.form.get('entry_timestamp') or None
             leave_timestamp = request.form.get('leave_timestamp') or None
-            
             if not crew_member_id or not shipyard_id:
                 flash('Crew member e cantiere sono obbligatori', 'error')
                 return redirect(request.url)
-            
             if not entry_timestamp and not leave_timestamp:
                 flash('Almeno una data (entrata o uscita) è obbligatoria', 'error')
                 return redirect(request.url)
-            
-            @connected_to_database
-            def insert_log(curs):
-                curs.execute(
-                    "INSERT INTO permanence_log (crew_member_id, shipyard_id, entry_timestamp, leave_timestamp) VALUES (%s, %s, %s, %s)",
-                    [crew_member_id, shipyard_id, entry_timestamp, leave_timestamp]
-                )
-            
-            insert_log()
+            curs.execute(
+                "INSERT INTO permanence_log (crew_member_id, shipyard_id, entry_timestamp, leave_timestamp) VALUES (%s, %s, %s, %s)",
+                [crew_member_id, shipyard_id, entry_timestamp, leave_timestamp]
+            )
             flash('Log aggiunto con successo', 'success')
             return redirect('/log')
-            
         except Exception as e:
             flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
             return redirect(request.url)
-    
     return render_template('log_add.html')
 
 @app.route('/log/edit/<int:log_id>', methods=['GET', 'POST'])
 @auth_required
-def edit_log(log_id):
+@connected_to_database
+def edit_log(curs, log_id):
     if request.method == 'POST':
         try:
             crew_member_id = request.form.get('crew_member_id')
             entry_timestamp = request.form.get('entry_timestamp') or None
             leave_timestamp = request.form.get('leave_timestamp') or None
-            
             if not crew_member_id:
                 flash('Crew member è obbligatorio', 'error')
                 return redirect(request.url)
-            
             if not entry_timestamp and not leave_timestamp:
                 flash('Almeno una data (entrata o uscita) è obbligatoria', 'error')
                 return redirect(request.url)
-            
-            @connected_to_database
-            def update_log(curs):
-                curs.execute(
-                    "UPDATE permanence_log SET crew_member_id = %s, entry_timestamp = %s, leave_timestamp = %s WHERE id = %s",
-                    [crew_member_id, entry_timestamp, leave_timestamp, log_id]
-                )
-            
-            update_log()
+            curs.execute(
+                "UPDATE permanence_log SET crew_member_id = %s, entry_timestamp = %s, leave_timestamp = %s WHERE id = %s",
+                [crew_member_id, entry_timestamp, leave_timestamp, log_id]
+            )
             flash('Log aggiornato con successo', 'success')
             return redirect('/log')
-            
         except Exception as e:
             flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
             return redirect(request.url)
-    
-    @connected_to_database
-    def get_log(curs):
-        curs.execute(
-            """SELECT pl.*, cm.name as crew_member_name, s.name as shipyard_name
-               FROM permanence_log pl
-               JOIN crew_member cm ON pl.crew_member_id = cm.id
-               JOIN shipyard s ON pl.shipyard_id = s.id
-               WHERE pl.id = %s""",
-            [log_id]
-        )
-        return curs.fetchone()
-    
-    log = get_log()
-    
+    # GET request
+    curs.execute(
+        """SELECT pl.*, cm.name as crew_member_name, s.name as shipyard_name
+           FROM permanence_log pl
+           JOIN crew_member cm ON pl.crew_member_id = cm.id
+           JOIN shipyard s ON pl.shipyard_id = s.id
+           WHERE pl.id = %s""",
+        [log_id]
+    )
+    log = curs.fetchone()
     if not log:
         flash('Log non trovato', 'error')
         return redirect('/log')
-    
     return render_template('log_edit.html', log=log)
 
 @app.route('/api/logs/delete/<int:log_id>', methods=['DELETE'])
@@ -1279,7 +1194,7 @@ def filter_shipyards(curs):
 
 if __name__ == "__main__":
     flask_env = get_env("FLASK_ENV")
-    flask_port = get_env("FLASK_PORT")
+    flask_port = int(get_env("FLASK_PORT"))
 
     match flask_env:
         case "development":

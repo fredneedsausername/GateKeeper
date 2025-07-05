@@ -26,17 +26,24 @@
                 </div>
                 {% endfor %}
 
-                <!-- Searchable Select Filters (Text input + Dynamic dropdown) -->
+                <!-- Searchable Select Filters -->
                 {% for filter in table_config.searchable_select_filters %}
-                <div class="base-filter-group" x-data="searchableFilter('{{ filter.key }}', '{{ filter.search_endpoint }}', '{{ request.args.get(filter.key, '') }}')">
+                <div class="base-filter-group" x-data="searchSelectFilter('{{ filter.key }}', '{{ filter.search_endpoint }}')">
                     <label class="base-filter-label">{{ filter.label }}</label>
-                    <input 
-                        type="text" 
-                        x-model="searchText"
-                        @input.debounce.500ms="searchOptions()"
-                        class="base-filter-input"
-                        placeholder="{{ filter.placeholder }}"
-                    >
+                    <input type="text"
+                           x-model="searchText"
+                           @input.debounce.500ms="searchOptions()"
+                           class="base-filter-input"
+                           placeholder="{{ filter.placeholder }}">
+                    <select name="{{ filter.key }}"
+                            x-model="selectedValue"
+                            class="base-filter-select"
+                            x-show="options.length > 0">
+                        <option value="">{{ filter.placeholder }}</option>
+                        <template x-for="opt in options" :key="opt.value">
+                            <option :value="opt.value" x-text="opt.label"></option>
+                        </template>
+                    </select>
                 </div>
                 {% endfor %}
 
@@ -179,93 +186,33 @@ function gateKeeperTable() {
     };
 }
 
-// Searchable filter component
-function searchableFilter(filterKey, searchEndpoint, initialValue) {
+// Search Select Filter component (mimics crew_add behavior)
+function searchSelectFilter(filterKey, searchEndpoint) {
     return {
-        filterKey: filterKey,
-        searchEndpoint: searchEndpoint,
         searchText: '',
-        selectedValue: initialValue,
+        selectedValue: '',
         options: [],
-        isLoading: false,
-        
-        init() {
-            // If there's an initial value, we should show it in the search text
-            if (this.selectedValue) {
-                this.loadInitialOption();
-            }
-        },
-        
-        async loadInitialOption() {
-            // Load the label for the initially selected value
-            this.isLoading = true;
-            try {
-                const response = await fetch(this.searchEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ 
-                        query: '',
-                        selected_id: this.selectedValue 
-                    })
-                });
-                
-                const data = await response.json();
-                if (data.options && data.options.length > 0) {
-                    const selectedOption = data.options.find(opt => opt.value == this.selectedValue);
-                    if (selectedOption) {
-                        this.searchText = selectedOption.label;
-                        // Only set options if we actually need to show the dropdown
-                        if (this.searchText.length >= 1) {
-                            this.options = data.options;
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading initial option:', error);
-            } finally {
-                this.isLoading = false;
-            }
-        },
-        
+
         async searchOptions() {
-            // Remove the length check - search immediately with any input
             const query = this.searchText.trim();
-            
-            this.isLoading = true;
+            // Hide dropdown and clear selection if input is empty
+            if (!query) {
+                this.options = [];
+                this.selectedValue = '';
+                return;
+            }
             try {
-                const response = await fetch(this.searchEndpoint, {
+                const response = await fetch(searchEndpoint, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ query: query })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: query})
                 });
-                
                 const data = await response.json();
                 this.options = data.options || [];
             } catch (error) {
                 console.error('Search error:', error);
                 this.options = [];
-            } finally {
-                this.isLoading = false;
             }
-        },
-        
-        updateForm() {
-            // Update search text to show the selected option's label
-            if (this.selectedValue) {
-                const selectedOption = this.options.find(opt => opt.value == this.selectedValue);
-                if (selectedOption) {
-                    this.searchText = selectedOption.label;
-                }
-            } else {
-                this.searchText = '';
-                this.options = []; // Clear options when no selection
-            }
-            
-            // HTMX will handle the form update automatically due to the change event
         }
     };
 }
@@ -280,6 +227,13 @@ document.addEventListener('htmx:afterRequest', function(evt) {
                 target: '#table-content'
             });
         }
+    }
+});
+
+// Add scroll to top after pagination swap
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'table-content') {
+        document.getElementById('table-content').scrollIntoView({ behavior: 'auto' });
     }
 });
 </script>

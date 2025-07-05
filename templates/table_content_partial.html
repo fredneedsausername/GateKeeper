@@ -1,4 +1,5 @@
 <!-- Table Content -->
+{% set base_path = request.path.split('/partial')[0] %}
 <div class="base-table-wrapper">
     <!-- Empty State -->
     {% if table_config.data|length == 0 %}
@@ -28,14 +29,22 @@
                 {% for column in table_config.columns %}
                 <td class="base-table-cell">
                     {% if column.type == 'battery' %}
-                    <div class="base-battery-indicator">
-                        <span class="base-battery-icon {% if row[column.key] %}{% if row[column.key] <= 20 %}base-battery-low{% elif row[column.key] <= 60 %}base-battery-medium{% else %}base-battery-high{% endif %}{% endif %}">🔋</span>
-                        <span>{% if row[column.key] %}{{ row[column.key] }}%{% endif %}</span>
-                    </div>
+                        {% if row[column.key] is none %}
+                            <span>N/A</span>
+                        {% else %}
+                            <div class="base-battery-indicator">
+                                <span class="base-battery-icon {% if row[column.key] <= 20 %}base-battery-low{% elif row[column.key] <= 60 %}base-battery-medium{% else %}base-battery-high{% endif %}">🔋</span>
+                                <span>{{ row[column.key] }}%</span>
+                            </div>
+                        {% endif %}
                     {% elif column.type == 'datetime' %}
                     <span>{{ row[column.key] | datetime_format }}</span>
                     {% else %}
-                    <span>{{ row[column.key] or '' }}</span>
+                    {% if column.key == 'tag_name' and row[column.key] is none %}
+                        <span>N/A</span>
+                    {% else %}
+                        <span>{{ row[column.key] or '' }}</span>
+                    {% endif %}
                     {% endif %}
                 </td>
                 {% endfor %}
@@ -82,30 +91,29 @@
 <!-- Pagination Info -->
 {% if table_config.data|length > 0 %}
 <div class="base-pagination-info">
-    {% if table_config.total_count > table_config.data|length %}
-    Visualizzati {{ table_config.data|length }} di {{ table_config.total_count }} risultati
+    {% set page_size = 50 %}
+    {% set start_idx = (table_config.page - 1) * page_size + 1 %}
+    {% set end_idx = start_idx + (table_config.data|length) - 1 %}
+    <span>{{ start_idx }}-{{ end_idx }} di {{ table_config.total_count }} risultati</span>
     {% if table_config.page and table_config.page > 1 %}
     {% set prev_page = table_config.page - 1 %}
     <button 
-        hx-get="{{ request.path }}/partial?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ prev_page }}" 
+        hx-get="{{ base_path }}/partial?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ prev_page }}" 
         hx-target="#table-content"
         hx-indicator=".htmx-indicator"
         style="margin-left: 16px; color: #2563eb; background: none; border: none; cursor: pointer; text-decoration: underline;">
         ← Precedente
     </button>
     {% endif %}
-    {% if table_config.data|length >= 50 %}
+    {% if table_config.page * page_size < table_config.total_count %}
     {% set next_page = table_config.page + 1 %}
     <button 
-        hx-get="{{ request.path }}/partial?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ next_page }}" 
+        hx-get="{{ base_path }}/partial?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ next_page }}" 
         hx-target="#table-content"
         hx-indicator=".htmx-indicator"
         style="margin-left: 16px; color: #2563eb; background: none; border: none; cursor: pointer; text-decoration: underline;">
         Successiva →
     </button>
-    {% endif %}
-    {% else %}
-    {{ table_config.data|length }} risultati
     {% endif %}
 </div>
 {% endif %}
