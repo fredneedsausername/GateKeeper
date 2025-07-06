@@ -17,7 +17,7 @@
                    x-model="shipSearch" 
                    @input.debounce.500ms="searchShips()"
                    placeholder="Cerca nave...">
-            <select x-model="formData.ship_id" x-show="ships.length > 0" name="ship_id">
+            <select x-cloak x-model="formData.ship_id" x-show="ships.length > 0" name="ship_id">
                 <option value="">Seleziona nave</option>
                 <template x-for="ship in ships" :key="ship.id">
                     <option :value="ship.id" x-text="ship.name"></option>
@@ -31,7 +31,7 @@
                    x-model="roleSearch" 
                    @input.debounce.500ms="searchRoles()"
                    placeholder="Cerca ruolo...">
-            <select x-model="formData.role_id" x-show="roles.length > 0" name="role_id">
+            <select x-cloak x-model="formData.role_id" x-show="roles.length > 0" name="role_id">
                 <option value="">Seleziona ruolo</option>
                 <template x-for="role in roles" :key="role.id">
                     <option :value="role.id" x-text="role.role_name"></option>
@@ -45,7 +45,7 @@
                    x-model="tagSearch" 
                    @input.debounce.500ms="searchTags()"
                    placeholder="Cerca tag esatto...">
-            <select x-model="formData.tag_id" x-show="tags.length > 0" name="tag_id">
+            <select x-cloak x-model="formData.tag_id" x-show="tags.length > 0" name="tag_id">
                 <option value="">Nessun tag</option>
                 <template x-for="tag in tags" :key="tag.id">
                     <option :value="tag.id" x-text="tag.name"></option>

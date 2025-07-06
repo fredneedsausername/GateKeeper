@@ -151,6 +151,11 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             return items, total
             
         elif table_type == "ship":
+            # Only show results if there is a filter applied (not just empty string)
+            has_filters = any(v for v in filters.values() if v and str(v).strip())
+            if not has_filters:
+                return [], 0
+
             # Base query parts
             from_where = "FROM ship WHERE 1=1"
             params = []
@@ -776,6 +781,9 @@ def delete_ship(curs, ship_id):
 @app.route('/tag/partial')
 @auth_required
 def tags_page():
+    # Default both Vacanti and Assegnati when no checkboxes selected
+    if not request.args.get('assigned') and not request.args.get('vacant') and not request.path.endswith('/partial'):
+        return redirect(f"{request.path}?assigned=1&vacant=1")
     # Get filters from URL parameters
     filters = {
         'assigned': request.args.get('assigned'),

@@ -17,7 +17,7 @@
                    x-model="crewSearch" 
                    @input.debounce.500ms="searchCrewMembers()"
                    placeholder="Cerca membro equipaggio...">
-            <select x-model="formData.crew_member_id" x-show="crewMembers.length > 0" name="crew_member_id">
+            <select x-cloak x-model="formData.crew_member_id" x-show="crewMembers.length > 0" name="crew_member_id">
                 <option value="">Nessun membro equipaggio</option>
                 <template x-for="member in crewMembers" :key="member.id">
                     <option :value="member.id" x-text="member.name"></option>

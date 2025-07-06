@@ -6,11 +6,12 @@
         
         <!-- Filters Section -->
         {% if table_config.text_filters or table_config.select_filters or table_config.searchable_select_filters or table_config.date_filters or table_config.checkbox_filters %}
-        <div hx-get="{{ request.path }}/partial" 
-             hx-target="#table-content" 
-             hx-trigger="input delay:500ms from:input, change from:select, change from:input[type=checkbox], submit"
-             hx-include="[name]"
-             hx-indicator=".htmx-indicator">
+        <form id="filter-form" hx-get="{{ request.path }}/partial" 
+              hx-target="#table-content" 
+              hx-trigger="input delay:500ms from:input, change from:select, change from:input[type=checkbox], submit"
+              hx-include="form"
+              hx-indicator=".htmx-indicator"
+              style="margin: 0;">
             <div class="base-filters-section">
                 <!-- Text Filters -->
                 {% for filter in table_config.text_filters %}
@@ -35,7 +36,7 @@
                            @input.debounce.500ms="searchOptions()"
                            class="base-filter-input"
                            placeholder="{{ filter.placeholder }}">
-                    <select name="{{ filter.key }}"
+                    <select x-cloak name="{{ filter.key }}"
                             x-model="selectedValue"
                             class="base-filter-select"
                             x-show="options.length > 0">
@@ -99,9 +100,6 @@
             <!-- Actions Bar -->
             <div class="base-actions-bar">
                 <div style="display: flex; gap: 12px;">
-                    <button type="submit" class="base-filter-reset" style="background-color: #2563eb; color: white; border-color: #2563eb;">
-                        Applica Filtri
-                    </button>
                     <a href="{{ request.path }}" class="base-filter-reset" style="text-decoration: none; display: inline-flex; align-items: center;">
                         Cancella Filtri
                     </a>
@@ -116,7 +114,7 @@
                 </a>
                 {% endif %}
             </div>
-        </div>
+        </form>
         {% endif %}
     </div>
 
@@ -169,8 +167,26 @@ function gateKeeperTable() {
                     });
                     
                     if (response.ok) {
-                        // Trigger HTMX refresh instead of full page reload
-                        htmx.trigger('#table-content', 'refresh');
+                        // Directly reload the table content instead of just triggering an event
+                        const tableContent = document.getElementById('table-content');
+                        if (tableContent) {
+                            // Get the current URL parameters from the filter form
+                            let queryParams = '';
+                            const filterForm = document.getElementById('filter-form');
+                            if (filterForm) {
+                                queryParams = new URLSearchParams(new FormData(filterForm)).toString();
+                            }
+                            
+                            // Get the base path and construct the URL for the partial content
+                            const path = window.location.pathname;
+                            const basePath = path.endsWith('/partial') ? path : path + '/partial';
+                            
+                            // Reload the table content
+                            htmx.ajax('GET', basePath + (queryParams ? '?' + queryParams : ''), {
+                                target: '#table-content',
+                                swap: 'innerHTML'
+                            });
+                        }
                     } else {
                         alert('Errore durante l\'eliminazione');
                     }
@@ -182,6 +198,9 @@ function gateKeeperTable() {
             this.showDeleteModal = false;
             this.itemToDelete = null;
             this.itemToDeleteName = '';
+        },
+        scrollToTop() {
+            document.getElementById('table-content').scrollIntoView({ behavior: 'auto' });
         }
     };
 }
@@ -216,24 +235,4 @@ function searchSelectFilter(filterKey, searchEndpoint) {
         }
     };
 }
-
-// Listen for HTMX events to refresh table content after delete
-document.addEventListener('htmx:afterRequest', function(evt) {
-    if (evt.detail.xhr.status === 200 && evt.detail.requestConfig.verb === 'delete') {
-        // Refresh the table content after successful delete
-        const tableContent = document.getElementById('table-content');
-        if (tableContent) {
-            htmx.ajax('GET', window.location.pathname + '/partial?' + new URLSearchParams(new FormData(document.querySelector('[hx-include]'))).toString(), {
-                target: '#table-content'
-            });
-        }
-    }
-});
-
-// Add scroll to top after pagination swap
-document.body.addEventListener('htmx:afterSwap', function(evt) {
-    if (evt.detail.target && evt.detail.target.id === 'table-content') {
-        document.getElementById('table-content').scrollIntoView({ behavior: 'auto' });
-    }
-});
 </script>

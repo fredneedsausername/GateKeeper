@@ -97,7 +97,7 @@
     <span>{{ start_idx }}-{{ end_idx }} di {{ table_config.total_count }} risultati</span>
     {% if table_config.page and table_config.page > 1 %}
     {% set prev_page = table_config.page - 1 %}
-    <button 
+    <button @click="scrollToTop()" 
         hx-get="{{ base_path }}/partial?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ prev_page }}" 
         hx-target="#table-content"
         hx-indicator=".htmx-indicator"
@@ -107,7 +107,7 @@
     {% endif %}
     {% if table_config.page * page_size < table_config.total_count %}
     {% set next_page = table_config.page + 1 %}
-    <button 
+    <button @click="scrollToTop()" 
         hx-get="{{ base_path }}/partial?{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ next_page }}" 
         hx-target="#table-content"
         hx-indicator=".htmx-indicator"
