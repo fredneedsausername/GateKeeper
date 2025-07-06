@@ -5,10 +5,11 @@
     <h2 class="base-content-title">Modifica Nave</h2>
     <p class="base-content-description">Modifica i dati della nave</p>
     
-    <form method="POST">
+    <form method="POST" x-data="{ nameValue: '{{ ship.name }}' }">
         <div class="base-form-group">
             <label for="name">Nome Nave *</label>
-            <input type="text" id="name" name="name" value="{{ ship.name }}" required>
+            <input type="text" id="name" name="name" x-model="nameValue" required maxlength="100">
+            <p class="text-sm text-gray-500 mt-1" x-show="nameValue.length >= 90" x-text="`${nameValue.length}/100 caratteri`"></p>
         </div>
         
         <div class="base-form-actions">

@@ -39,6 +39,7 @@ In case it is decided that the tags are automatically registered by the system w
 [ ] Well put "no results found" page
 [ ] Every single textbox area can't exceed the limit imposed by the database
 [ ] Table pagination works properly
+[ ] Can delete succesfully
 
 For:
 

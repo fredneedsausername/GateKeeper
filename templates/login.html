@@ -223,7 +223,9 @@
                         :disabled="loading"
                         class="input-field"
                         placeholder="Inserisci il tuo nome utente"
+                        maxlength="50"
                     >
+                    <p class="text-sm text-gray-500 mt-1" x-show="formData.username.length >= 40" x-text="`${formData.username.length}/50 caratteri`"></p>
                 </div>
 
                 <!-- Password Field -->
@@ -237,7 +239,9 @@
                         :disabled="loading"
                         class="input-field"
                         placeholder="Inserisci la tua password"
+                        maxlength="20"
                     >
+                    <p class="text-sm text-gray-500 mt-1" x-show="formData.password.length >= 10" x-text="`${formData.password.length}/20 caratteri`"></p>
                 </div>
 
                 <!-- Submit Button -->

@@ -6,6 +6,12 @@ from psycopg_pool import ConnectionPool
 from functools import wraps
 from datetime import datetime, timedelta
 import base64
+from typing import TypeVar, ParamSpec, Callable, Concatenate, Any
+
+# Type variables for typing the decorator
+P = ParamSpec('P')
+R = TypeVar('R')
+CursorType = Any
 
 def auth_required(fn):
     @wraps(fn)
@@ -30,14 +36,14 @@ db_pool = ConnectionPool(
     configure=lambda conn: setattr(conn, 'row_factory', dict_row)
 )
 
-def connected_to_database(fn):
+def connected_to_database(fn: Callable[Concatenate[CursorType, P], R]) -> Callable[P, R]:
     @wraps(fn)
-    def wrapped_function(*args, **kwargs):
-         with db_pool.connection() as conn:
-              with conn.cursor() as curs:
-                   ret = fn(curs, *args, **kwargs)
-                   conn.commit()
-                   return ret
+    def wrapped_function(*args: P.args, **kwargs: P.kwargs) -> R:
+        with db_pool.connection() as conn:
+            with conn.cursor() as curs:
+                ret = fn(curs, *args, **kwargs)
+                conn.commit()
+        return ret
     return wrapped_function
 
 app = Flask(__name__)

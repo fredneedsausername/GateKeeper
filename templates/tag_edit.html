@@ -8,7 +8,8 @@
     <form method="POST" x-data="tagEditForm({{ tag|tojson }})">
         <div class="base-form-group">
             <label for="name">Nome Tag *</label>
-            <input type="text" id="name" name="name" x-model="formData.name" required>
+            <input type="text" id="name" name="name" x-model="formData.name" required maxlength="20">
+            <p class="text-sm text-gray-500 mt-1" x-show="formData.name.length >= 10" x-text="`${formData.name.length}/20 caratteri`"></p>
         </div>
         
         <div class="base-form-group">
