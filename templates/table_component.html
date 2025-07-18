@@ -39,8 +39,9 @@
                     <select x-cloak name="{{ filter.key }}"
                             x-model="selectedValue"
                             class="base-filter-select"
-                            x-show="options.length > 0">
+                            x-show="options.length > 0 || searchText">
                         <option value="">{{ filter.placeholder }}</option>
+                        <option disabled x-show="options.length === 0">Nessun risultato trovato</option>
                         <template x-for="opt in options" :key="opt.value">
                             <option :value="opt.value" x-text="opt.label"></option>
                         </template>
@@ -122,83 +123,11 @@
     <div id="table-content">
         {% include 'table_content_partial.html' %}
     </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div x-show="showDeleteModal" x-cloak class="base-modal-overlay" @click.self="showDeleteModal = false">
-        <div class="base-modal-content" @click.stop>
-            <h3 class="base-modal-title">Conferma Eliminazione</h3>
-            <p class="base-modal-description">Sei sicuro di voler eliminare <strong x-text="itemToDeleteName"></strong>? Questa azione non può essere annullata.</p>
-            <div class="base-modal-actions">
-                <button class="base-modal-button base-secondary" @click="showDeleteModal = false">
-                    Annulla
-                </button>
-                <button class="base-modal-button base-primary" @click="handleDelete()">
-                    Elimina
-                </button>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>
 function gateKeeperTable() {
     return {
-        // Modal only
-        showDeleteModal: false,
-        itemToDelete: null,
-        itemToDeleteName: '',
-
-        // Action handlers
-        confirmDelete(itemId, itemName) {
-            this.itemToDelete = itemId;
-            this.itemToDeleteName = itemName;
-            this.showDeleteModal = true;
-        },
-
-        async handleDelete() {
-            if (this.itemToDelete) {
-                try {
-                    const deleteUrl = '{{ table_config.delete_url }}'.replace('{id}', this.itemToDelete);
-                    const response = await fetch(deleteUrl, {
-                        method: 'DELETE',
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        // Directly reload the table content instead of just triggering an event
-                        const tableContent = document.getElementById('table-content');
-                        if (tableContent) {
-                            // Get the current URL parameters from the filter form
-                            let queryParams = '';
-                            const filterForm = document.getElementById('filter-form');
-                            if (filterForm) {
-                                queryParams = new URLSearchParams(new FormData(filterForm)).toString();
-                            }
-                            
-                            // Get the base path and construct the URL for the partial content
-                            const path = window.location.pathname;
-                            const basePath = path.endsWith('/partial') ? path : path + '/partial';
-                            
-                            // Reload the table content
-                            htmx.ajax('GET', basePath + (queryParams ? '?' + queryParams : ''), {
-                                target: '#table-content',
-                                swap: 'innerHTML'
-                            });
-                        }
-                    } else {
-                        alert('Errore durante l\'eliminazione');
-                    }
-                } catch (error) {
-                    console.error('Delete error:', error);
-                    alert('Errore durante l\'eliminazione');
-                }
-            }
-            this.showDeleteModal = false;
-            this.itemToDelete = null;
-            this.itemToDeleteName = '';
-        },
         scrollToTop() {
             document.getElementById('table-content').scrollIntoView({ behavior: 'auto' });
         }
@@ -211,10 +140,8 @@ function searchSelectFilter(filterKey, searchEndpoint) {
         searchText: '',
         selectedValue: '',
         options: [],
-
         async searchOptions() {
             const query = this.searchText.trim();
-            // Hide dropdown and clear selection if input is empty
             if (!query) {
                 this.options = [];
                 this.selectedValue = '';

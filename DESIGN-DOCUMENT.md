@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS shipyard (
 
 CREATE TABLE IF NOT EXISTS activator_beacon (
     id SERIAL PRIMARY KEY,
-    number INTEGER UNIQUE CHECK (number != 0),
+    mac_address MACADDR UNIQUE,
     shipyard_id INTEGER,
     is_first_when_entering BOOLEAN,
     CONSTRAINT fk_beacon_shipyard 
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS activator_beacon (
 
 CREATE TABLE IF NOT EXISTS tag (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(20) UNIQUE,
+    name VARCHAR(29) UNIQUE,
     remaining_battery REAL,
     packet_counter INTEGER
 );
@@ -94,13 +94,14 @@ CREATE TABLE IF NOT EXISTS crew_member (
     CONSTRAINT fk_crew_tag 
         FOREIGN KEY (tag_id) 
         REFERENCES tag(id) 
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
+    CONSTRAINT unique_tag_assignment UNIQUE (tag_id)
 );
 
 CREATE TABLE IF NOT EXISTS permanence_log (
     id SERIAL PRIMARY KEY,
     crew_member_id INTEGER,
-    shipyard_id INTEGER,
+    _id INTEGER,
     entry_timestamp TIMESTAMP,
     leave_timestamp TIMESTAMP,
     CONSTRAINT fk_log_crew 

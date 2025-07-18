@@ -1,0 +1,150 @@
+Event received when a Ble device is detected and reported by the gateway.
+
+{
+    "deviceCode": "bcf0732f‐803b‐436c‐94ca‐5d4a86dcd9a2",
+    "from": "BLE",
+    "to": "GATEWAY",
+    "mac": "30:ae:7b:e2:23:78",
+    "type": "reportAttribute",
+    "time": 1747659778,
+    "data": {
+        "attribute": "mod.device_list",
+        "mac": "30:ae:7b:e2:23:78",
+        "value": {
+            "device_list": [
+                {
+                    "modelstr": "Bledevice",
+                    "dev_name": "BE_PSOC0005",
+                    "connectable": 1,
+                    "ble_addr": "0C:2A:6F:8A:70:95",
+                    "addr_type": 0,
+                    "scan_time": 1747659770,
+                    "scan_rssi": ‐43,
+                    "data":
+                    "0201061BFFBE050100000000000000000000000000000000000000000000001E0942455F50534F4330303035000000000000000000000000000000000000",
+                    "connect": 0
+                },
+                {
+                    "modelstr": "Bledevice",
+                    "dev_name": "BE_MTEC0003",
+                    "connectable": 1,
+                    "ble_addr": "0C:2A:6F:8A:72:47",
+                    "addr_type": 0,
+                    "scan_time": 1747659778,
+                    "scan_rssi": ‐39,
+                    "data":
+                    "0201061BFFBE050100000000000000000000000000000000000000000000001E0942455F4D54454330303033000000000000000000000000000000000000",
+                    "connect": 0
+                }
+            ]
+        }
+    }
+}
+
++-------------+------------------------------------------------------------+
+| Field       | Description                                                |
++-------------+------------------------------------------------------------+
+| from        | Sender of message                                          |
++-------------+------------------------------------------------------------+
+| to          | Receiver of the message                                    |
++-------------+------------------------------------------------------------+
+| mac         | MAC address of the gateway                                 |
++-------------+------------------------------------------------------------+
+| time        | 32-bit Unix epoch                                          |
++-------------+------------------------------------------------------------+
+| type        | Message type                                               |
++-------------+------------------------------------------------------------+
+| deviceCode  | Not used.                                                  |
++-------------+------------------------------------------------------------+
+| data        | Data                                                       |
++-------------+------------------------------------------------------------+
+|             | mac        | MAC address of the gateway                    |
++             +------------+-----------------------------------------------+
+|             | attribute  | Attribute of this command                     |
++             +------------+-----------------------------------------------+
+|             | value      | Report value                                  |
++             +------------+-----------------------------------------------+
+|             |            | modelstr    | Type of the ble device          |
++             +            +-------------+---------------------------------+
+|             |            | dev_name    | Friendly name                   |
++             +            +-------------+---------------------------------+
+|             |            | connectable | Connectable/not connectable     |
++             +            +-------------+---------------------------------+
+|             |            | ble_addr    | Mac address of ble device       |
++             +            +-------------+---------------------------------+
+|             |            | addr_type   | Type of the address (0: Public, |
+|             |            |             | 1: Random)                      |
++             +            +-------------+---------------------------------+
+|             |            | scan_time   | Detection time (32-bit Unix     |
+|             |            |             | epoch)                          |
++             +            +-------------+---------------------------------+
+|             |            | scan_rssi   | Detection rssi                  |
++             +            +-------------+---------------------------------+
+|             |            | data        | Advertising data. Contains      |
+|             |            |             | advertising + scan response data|
++             +            +-------------+---------------------------------+
+|             |            | connect     | BFU                             |
++-------------+------------+-------------+---------------------------------+
+
+020106  1B  FF  BE05  01  00  00  00  0000000000000000000000000000000000000000  1E  09  42455F50534F4330303035000000000000000000000000000000000000
+020106 -> header
+1B -> ad length
+FF -> ad type (nothing about it specified in docs)
+BE05 -> manufacturer specific data
+01 -> Source type (02 is EchoBeacon, 01 is Beacon)
+00 -> Action type (follows bit mask specified in the table below)
++----------+-----+-----+-----+-----+-----+-----+-----+------+
+| Name     |           Action Type                          |
++----------+-----+-----+-----+-----+-----+-----+-----+------+
+| Bit Name | RFU |Out3 |Out2 |Out1 | RFU | RFU | RFU | BTN1 |
++----------+-----+-----+-----+-----+-----+-----+-----+------+
+| Default  |  0  |  0  |  0  |  0  |  0  |  0  |  0  |  0   |
++----------+-----+-----+-----+-----+-----+-----+-----+------+
+| Bit Pos. |  7  |  6  |  5  |  4  |  3  |  2  |  1  |  0   |
++----------+-----+-----+-----+-----+-----+-----+-----+------+
+
+00 -> Type (00 is watchdog, 01 is button press/boot, 04 is accelerometer)
+0000000000000000000000000000000000000000 -> custom data of the message
+
+
+Here's what we care about for our application:
+
+{
+    "from": "BLE",
+    "to": "GATEWAY",
+    "mac": "30:ae:7b:e2:23:78",
+    "type": "reportAttribute",
+    "time": 1747659778,
+    "data": {
+        "attribute": "mod.device_list",
+        "mac": "30:ae:7b:e2:23:78",
+        "value": {
+            "device_list": [
+                {
+                    "modelstr": "Bledevice",
+                    "dev_name": "BE_PSOC0005",
+                    "connectable": 1,
+                    "ble_addr": "0C:2A:6F:8A:70:95",
+                    "addr_type": 0,
+                    "scan_time": 1747659770,
+                    "scan_rssi": ‐43,
+                    "data":
+                    "0201061BFFBE050100000000000000000000000000000000000000000000001E0942455F50534F4330303035000000000000000000000000000000000000",
+                    "connect": 0
+                },
+                {
+                    "modelstr": "Bledevice",
+                    "dev_name": "BE_MTEC0003",
+                    "connectable": 1,
+                    "ble_addr": "0C:2A:6F:8A:72:47",
+                    "addr_type": 0,
+                    "scan_time": 1747659778,
+                    "scan_rssi": ‐39,
+                    "data":
+                    "0201061BFFBE050100000000000000000000000000000000000000000000001E0942455F4D54454330303033000000000000000000000000000000000000",
+                    "connect": 0
+                }
+            ]
+        }
+    }
+}

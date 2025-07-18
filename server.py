@@ -212,6 +212,11 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 # No checkboxes selected - return empty
                 return [], 0
             
+            # Filter by tag name if provided
+            if filters.get('tag_name') and filters['tag_name'].strip():
+                filter_conditions += " AND LOWER(t.name) LIKE LOWER(%s)"
+                params.append(f"%{filters['tag_name'].strip()}%")
+            
             # Count total
             count_query = f"SELECT COUNT(*) as count {from_where} {filter_conditions}"
             curs.execute(count_query, params)
@@ -274,8 +279,8 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 params.append(int(filters['shipyard_id']))
             
             if filters.get('tag_name') and filters['tag_name'].strip():
-                filter_conditions += " AND t.name = %s"
-                params.append(filters['tag_name'].strip())
+                filter_conditions += " AND LOWER(t.name) LIKE LOWER(%s)"
+                params.append(f"%{filters['tag_name'].strip()}%")
             
             # Count total
             count_query = f"SELECT COUNT(*) as count {from_where} {filter_conditions}"
@@ -438,7 +443,7 @@ def create_table_config(table_type, filters, page, request_path):
             "allow_edit": True,
             "allow_delete": True,
             "add_button_text": "Aggiungi Nave",
-            "empty_message": "Nessuna nave trovata.",
+            "empty_message": "Applica dei filtri per visualizzare le navi.",
             "add_url": "/navi/add",
             "edit_url": "/navi/edit/{id}",
             "delete_url": "/api/ships/delete/{id}",
@@ -455,6 +460,9 @@ def create_table_config(table_type, filters, page, request_path):
                 {"key": "name", "label": "Tag", "type": "text"},
                 {"key": "remaining_battery", "label": "🔋%", "type": "battery"},
                 {"key": "crew_member_name", "label": "Equipaggio", "type": "text"}
+            ],
+            "text_filters": [
+                {"key": "tag_name", "label": "Nome Tag", "placeholder": "Cerca per nome..."}
             ],
             "checkbox_filters": [
                 {"key": "assigned", "label": "Assegnati"},
@@ -475,8 +483,8 @@ def create_table_config(table_type, filters, page, request_path):
     
     elif table_type == "unassigned_tag_entry":
         return {
-            "title": "Log Entrate",
-            "description": "Visualizza le entrate di tag non assegnati",
+            "title": "Entry dei Tag",
+            "description": "Visualizza gli eventi dei tag non assegnati",
             "columns": [
                 {"key": "shipyard_name", "label": "Cantiere", "type": "text"},
                 {"key": "tag_name", "label": "Tag", "type": "text"},
@@ -505,7 +513,7 @@ def create_table_config(table_type, filters, page, request_path):
             "allow_add": False,
             "allow_edit": False,
             "allow_delete": True,
-            "empty_message": "Nessuna entrata trovata nel periodo selezionato.",
+            "empty_message": "Nessuna entry trovata nel periodo selezionato.",
             "delete_url": "/api/entries/delete/{id}",
             "data": data,
             "total_count": total_count,
@@ -644,6 +652,13 @@ def add_crew(curs):
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
+            # Enforce that a tag can only be assigned to one crew member
+            if tag_id:
+                curs.execute("SELECT COUNT(*) as count FROM crew_member WHERE tag_id = %s", [tag_id])
+                result = curs.fetchone()
+                if result and result['count'] > 0:
+                    flash('Tag già assegnato a un altro membro dell\'equipaggio', 'error')
+                    return redirect(request.url)
             curs.execute(
                 "INSERT INTO crew_member (name, ship_id, role_id, tag_id) VALUES (%s, %s, %s, %s)",
                 [name, ship_id, role_id, tag_id]
@@ -668,6 +683,13 @@ def edit_crew(curs, crew_id):
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
+            # Enforce that a tag can only be assigned to one crew member except itself
+            if tag_id:
+                curs.execute("SELECT COUNT(*) as count FROM crew_member WHERE tag_id = %s AND id != %s", [tag_id, crew_id])
+                result = curs.fetchone()
+                if result and result['count'] > 0:
+                    flash('Tag già assegnato a un altro membro dell\'equipaggio', 'error')
+                    return redirect(request.url)
             curs.execute(
                 "UPDATE crew_member SET name = %s, ship_id = %s, role_id = %s, tag_id = %s WHERE id = %s",
                 [name, ship_id, role_id, tag_id, crew_id]
@@ -793,7 +815,8 @@ def tags_page():
     # Get filters from URL parameters
     filters = {
         'assigned': request.args.get('assigned'),
-        'vacant': request.args.get('vacant')
+        'vacant': request.args.get('vacant'),
+        'tag_name': request.args.get('tag_name', '').strip()
     }
     
     page = int(request.args.get('page', 1))
@@ -1080,18 +1103,30 @@ def search_roles(curs):
 def search_tags(curs):
     data = request.get_json()
     query = data.get('query', '').strip()
-    
-    # Remove the 2-character minimum requirement
-    curs.execute(
-        """SELECT t.id, t.name 
-           FROM tag t 
-           LEFT JOIN crew_member cm ON t.id = cm.tag_id 
-           WHERE t.name = %s AND cm.id IS NULL 
-           ORDER BY t.name LIMIT 10""",
-        [query]
-    )
+    current_tag_id = data.get('current_tag_id') or None
+
+    # Search only unassigned tags, but include the current tag if editing
+    params = [f"%{query}%"]
+    subquery = "SELECT tag_id FROM crew_member WHERE tag_id IS NOT NULL"
+    if current_tag_id:
+        sql = (
+            "SELECT t.id, t.name "
+            "FROM tag t "
+            "WHERE LOWER(t.name) LIKE LOWER(%s) "
+            "  AND (t.id = %s OR t.id NOT IN (" + subquery + ")) "
+            "ORDER BY t.name LIMIT 10"
+        )
+        params.append(current_tag_id)
+    else:
+        sql = (
+            "SELECT t.id, t.name "
+            "FROM tag t "
+            "WHERE LOWER(t.name) LIKE LOWER(%s) "
+            "  AND t.id NOT IN (" + subquery + ") "
+            "ORDER BY t.name LIMIT 10"
+        )
+    curs.execute(sql, params)
     tags = curs.fetchall()
-    
     return jsonify({"tags": tags})
 
 @app.route('/api/crew/search', methods=['POST'])

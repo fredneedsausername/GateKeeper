@@ -17,7 +17,6 @@
         p {
             margin: 0;
         }
-        
         [x-cloak] {
             display: none !important;
         }
@@ -409,6 +408,7 @@
             flex-wrap: wrap;
             gap: 16px;
             margin-bottom: 24px;
+            align-items: center;
         }
 
         .base-filter-group {
@@ -448,6 +448,7 @@
             display: flex;
             gap: 16px;
             align-items: center;
+            transform: translateY(50%);
         }
 
         .base-checkbox-group {
@@ -1016,22 +1017,7 @@
 
         <!-- Main Content Area -->
         <main class="base-main-content">
-            <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="base-flash-messages">
-                        {% for category, message in messages %}
-                            <div class="base-flash-message {{ category }}" x-data="{ show: true }" x-show="show">
-                                <span>{{ message }}</span>
-                                <button class="base-flash-close" @click="show = false" type="button">
-                                    ×
-                                </button>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
-
+            <!-- Flash messages removed globally -->
             {% block body %}{% endblock %}
         </main>
     </div>

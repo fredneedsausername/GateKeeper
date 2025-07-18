@@ -9,11 +9,13 @@
         <div class="base-form-group">
             <label for="crew_member">Equipaggio *</label>
             <input type="text" 
-                   x-model="crewSearch" 
+                   x-model="crewSearch"
+                   @focus="searchCrewMembers()"
                    @input.debounce.500ms="searchCrewMembers()"
                    placeholder="Cerca membro equipaggio...">
-            <select x-cloak x-model="formData.crew_member_id" x-show="crewMembers.length > 0" name="crew_member_id" required>
-                <option value="">Seleziona membro equipaggio</option>
+            <select x-cloak x-model="formData.crew_member_id" x-show="crewMembers.length > 0 || crewSearch" name="crew_member_id" required>
+                <option value="">Nessun membro equipaggio</option>
+                <option disabled x-show="crewMembers.length === 0">Nessun risultato trovato</option>
                 <template x-for="member in crewMembers" :key="member.id">
                     <option :value="member.id" x-text="member.name"></option>
                 </template>
@@ -26,8 +28,9 @@
                    x-model="shipyardSearch" 
                    @input.debounce.500ms="searchShipyards()"
                    placeholder="Cerca cantiere...">
-            <select x-cloak x-model="formData.shipyard_id" x-show="shipyards.length > 0" name="shipyard_id" required>
-                <option value="">Seleziona cantiere</option>
+            <select x-cloak x-model="formData.shipyard_id" x-show="shipyards.length > 0 || shipyardSearch" name="shipyard_id" required>
+                <option value="">Nessun cantiere</option>
+                <option disabled x-show="shipyards.length === 0">Nessun risultato trovato</option>
                 <template x-for="shipyard in shipyards" :key="shipyard.id">
                     <option :value="shipyard.id" x-text="shipyard.name"></option>
                 </template>

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="base-content-card">
+    <h2 class="base-content-title">Modifica Cantiere</h2>
+    <p class="base-content-description">Modifica i dati del cantiere</p>
+
+    <form method="POST" x-data="{ nameValue: '{{ shipyard.name }}' }">
+        <div class="base-form-group">
+            <label for="name">Nome Cantiere *</label>
+            <input type="text" id="name" name="name" x-model="nameValue" required maxlength="50" value="{{ shipyard.name|e }}">
+            <p class="text-sm text-gray-500 mt-1" x-show="nameValue.length >= 45" x-text="`${nameValue.length}/50 caratteri`"></p>
+        </div>
+
+        <div class="base-form-actions">
+            <button type="button" onclick="window.location.href='/shipyard'" class="base-btn-secondary">
+                Annulla
+            </button>
+            <button type="submit" class="base-btn-primary">
+                Aggiorna Cantiere
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %} 

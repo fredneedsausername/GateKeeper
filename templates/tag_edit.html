@@ -5,21 +5,27 @@
     <h2 class="base-content-title">Modifica Tag</h2>
     <p class="base-content-description">Modifica i dati del tag</p>
     
-    <form method="POST" x-data="tagEditForm({{ tag|tojson }})">
+    <form method="POST" x-data='tagEditForm({{ tag|tojson }})' @click.away="showSuggestions = false">
         <div class="base-form-group">
             <label for="name">Nome Tag *</label>
-            <input type="text" id="name" name="name" x-model="formData.name" required maxlength="20">
+            <input type="text" id="name" name="name" x-model="formData.name" required maxlength="20" value="{{ tag.name|e }}">
             <p class="text-sm text-gray-500 mt-1" x-show="formData.name.length >= 10" x-text="`${formData.name.length}/20 caratteri`"></p>
         </div>
         
         <div class="base-form-group">
             <label for="crew_member">Riassegna a Equipaggio</label>
             <input type="text" 
-                   x-model="crewSearch" 
+                   x-model="crewSearch"
+                   @focus="showSuggestions = true; searchCrewMembers()"
                    @input.debounce.500ms="searchCrewMembers()"
-                   placeholder="Cerca membro equipaggio...">
-            <select x-cloak x-model="formData.crew_member_id" x-show="crewMembers.length > 0" name="crew_member_id">
+                   placeholder="Cerca membro equipaggio..."
+                   value="{{ tag.crew_member_name|default('')|e }}">
+            <select x-cloak x-model="formData.crew_member_id" x-show="showSuggestions" name="crew_member_id">
                 <option value="">Nessun membro equipaggio</option>
+                <option disabled x-show="crewMembers.length === 0">Nessun risultato trovato</option>
+                {% if tag.crew_member_id %}
+                    <option value="{{ tag.crew_member_id|e }}" selected>{{ tag.crew_member_name|e }}</option>
+                {% endif %}
                 <template x-for="member in crewMembers" :key="member.id">
                     <option :value="member.id" x-text="member.name" :selected="member.id == formData.crew_member_id"></option>
                 </template>
@@ -46,6 +52,7 @@ function tagEditForm(existingData) {
         },
         crewSearch: existingData.crew_member_name || '',
         crewMembers: existingData.crew_member_name ? [{id: existingData.crew_member_id, name: existingData.crew_member_name}] : [],
+        showSuggestions: false,
         
         async searchCrewMembers() {
             // Remove the length check - search immediately with any input

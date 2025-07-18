@@ -5,10 +5,10 @@
     <h2 class="base-content-title">Modifica Crew Member</h2>
     <p class="base-content-description">Modifica i dati del membro dell'equipaggio</p>
     
-    <form method="POST" x-data="crewEditForm({{ crew_member|tojson }})">
+    <form method="POST" x-data='crewEditForm({{ crew_member|tojson }})'>
         <div class="base-form-group">
             <label for="name">Nome *</label>
-            <input type="text" id="name" name="name" x-model="formData.name" required maxlength="100">
+            <input type="text" id="name" name="name" x-model="formData.name" required maxlength="100" value="{{ crew_member.name|e }}">
             <p class="text-sm text-gray-500 mt-1" x-show="formData.name.length >= 90" x-text="`${formData.name.length}/100 caratteri`"></p>
         </div>
         
@@ -16,10 +16,16 @@
             <label for="ship">Nave</label>
             <input type="text" 
                    x-model="shipSearch" 
+                   @focus="searchShips()"
                    @input.debounce.500ms="searchShips()"
-                   placeholder="Cerca nave...">
-            <select x-cloak x-model="formData.ship_id" x-show="ships.length > 0" name="ship_id">
-                <option value="">Seleziona nave</option>
+                   placeholder="Cerca nave..."
+                   value="{{ crew_member.ship_name|default('')|e }}">
+            <select x-cloak x-model="formData.ship_id" x-show="ships.length > 0 || shipSearch" name="ship_id">
+                <option value="">Nessuna nave</option>
+                <option disabled x-show="ships.length === 0">Nessun risultato trovato</option>
+                {% if crew_member.ship_id %}
+                    <option value="{{ crew_member.ship_id|e }}" selected>{{ crew_member.ship_name|e }}</option>
+                {% endif %}
                 <template x-for="ship in ships" :key="ship.id">
                     <option :value="ship.id" x-text="ship.name" :selected="ship.id == formData.ship_id"></option>
                 </template>
@@ -30,10 +36,13 @@
             <label for="role">Ruolo</label>
             <input type="text" 
                    x-model="roleSearch" 
+                   @focus="searchRoles()"
                    @input.debounce.500ms="searchRoles()"
-                   placeholder="Cerca ruolo...">
-            <select x-cloak x-model="formData.role_id" x-show="roles.length > 0" name="role_id">
-                <option value="">Seleziona ruolo</option>
+                   placeholder="Cerca ruolo..."
+                   value="{{ crew_member.role_name|default('')|e }}">
+            <select x-cloak x-model="formData.role_id" x-show="roles.length > 0 || roleSearch" name="role_id">
+                <option value="">Nessun ruolo</option>
+                <option disabled x-show="roles.length === 0">Nessun risultato trovato</option>
                 <template x-for="role in roles" :key="role.id">
                     <option :value="role.id" x-text="role.role_name" :selected="role.id == formData.role_id"></option>
                 </template>
@@ -44,10 +53,13 @@
             <label for="tag">Tag (Opzionale)</label>
             <input type="text" 
                    x-model="tagSearch" 
+                   @focus="searchTags()"
                    @input.debounce.500ms="searchTags()"
-                   placeholder="Cerca tag esatto...">
-            <select x-cloak x-model="formData.tag_id" x-show="tags.length > 0" name="tag_id">
+                   placeholder="Cerca tag esatto..."
+                   value="{{ crew_member.tag_name|default('')|e }}">
+            <select x-cloak x-model="formData.tag_id" x-show="tags.length > 0 || tagSearch" name="tag_id">
                 <option value="">Nessun tag</option>
+                <option disabled x-show="tags.length === 0">Nessun risultato trovato</option>
                 <template x-for="tag in tags" :key="tag.id">
                     <option :value="tag.id" x-text="tag.name" :selected="tag.id == formData.tag_id"></option>
                 </template>
@@ -82,7 +94,6 @@ function crewEditForm(existingData) {
         tags: existingData.tag_name ? [{id: existingData.tag_id, name: existingData.tag_name}] : [],
         
         async searchShips() {
-            // Remove the length check - search immediately with any input
             const query = this.shipSearch.trim();
             
             try {
@@ -103,7 +114,6 @@ function crewEditForm(existingData) {
         },
         
         async searchRoles() {
-            // Remove the length check - search immediately with any input
             const query = this.roleSearch.trim();
             
             try {
@@ -124,7 +134,6 @@ function crewEditForm(existingData) {
         },
         
         async searchTags() {
-            // Remove the length check - search immediately with any input
             const query = this.tagSearch.trim();
             
             try {
@@ -133,7 +142,7 @@ function crewEditForm(existingData) {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query, current_tag_id: this.formData.tag_id || null })
                 });
                 
                 const data = await response.json();

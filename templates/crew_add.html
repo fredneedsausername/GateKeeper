@@ -16,10 +16,12 @@
             <label for="ship">Nave</label>
             <input type="text" 
                    x-model="shipSearch" 
+                   @focus="searchShips()"
                    @input.debounce.500ms="searchShips()"
                    placeholder="Cerca nave...">
-            <select x-cloak x-model="formData.ship_id" x-show="ships.length > 0" name="ship_id">
-                <option value="">Seleziona nave</option>
+            <select x-cloak x-model="formData.ship_id" x-show="ships.length > 0 || shipSearch" name="ship_id">
+                <option value="">Nessuna nave</option>
+                <option disabled x-show="ships.length === 0">Nessun risultato trovato</option>
                 <template x-for="ship in ships" :key="ship.id">
                     <option :value="ship.id" x-text="ship.name"></option>
                 </template>
@@ -30,10 +32,12 @@
             <label for="role">Ruolo</label>
             <input type="text" 
                    x-model="roleSearch" 
+                   @focus="searchRoles()"
                    @input.debounce.500ms="searchRoles()"
                    placeholder="Cerca ruolo...">
-            <select x-cloak x-model="formData.role_id" x-show="roles.length > 0" name="role_id">
-                <option value="">Seleziona ruolo</option>
+            <select x-cloak x-model="formData.role_id" x-show="roles.length > 0 || roleSearch" name="role_id">
+                <option value="">Nessun ruolo</option>
+                <option disabled x-show="roles.length === 0">Nessun risultato trovato</option>
                 <template x-for="role in roles" :key="role.id">
                     <option :value="role.id" x-text="role.role_name"></option>
                 </template>
@@ -44,10 +48,12 @@
             <label for="tag">Tag (Opzionale)</label>
             <input type="text" 
                    x-model="tagSearch" 
+                   @focus="searchTags()"
                    @input.debounce.500ms="searchTags()"
                    placeholder="Cerca tag esatto...">
-            <select x-cloak x-model="formData.tag_id" x-show="tags.length > 0" name="tag_id">
+            <select x-cloak x-model="formData.tag_id" x-show="tags.length > 0 || tagSearch" name="tag_id">
                 <option value="">Nessun tag</option>
+                <option disabled x-show="tags.length === 0">Nessun risultato trovato</option>
                 <template x-for="tag in tags" :key="tag.id">
                     <option :value="tag.id" x-text="tag.name"></option>
                 </template>
@@ -133,7 +139,7 @@ function crewForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query, current_tag_id: this.formData.tag_id || null })
                 });
                 
                 const data = await response.json();

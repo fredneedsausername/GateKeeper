@@ -33,8 +33,7 @@
                             <span>N/A</span>
                         {% else %}
                             <div class="base-battery-indicator">
-                                <span class="base-battery-icon {% if row[column.key] <= 20 %}base-battery-low{% elif row[column.key] <= 60 %}base-battery-medium{% else %}base-battery-high{% endif %}">🔋</span>
-                                <span>{{ row[column.key] }}%</span>
+                                <span class="{% if row[column.key] <= 20 %}base-battery-low{% elif row[column.key] <= 60 %}base-battery-medium{% else %}base-battery-high{% endif %}">{{ row[column.key] }}</span>
                             </div>
                         {% endif %}
                     {% elif column.type == 'datetime' %}
@@ -65,9 +64,9 @@
                         </a>
                         {% endif %}
                         {% if table_config.allow_delete %}
-                        <button 
-                            class="base-action-button base-delete" 
-                            @click="$dispatch('confirm-delete', { id: {{ row.id }}, name: '{{ row.name or row.crew_member_name or row.tag_name or 'questo elemento' }}' })"
+                        <button
+                            class="base-action-button base-delete"
+                            @click.prevent="if (!confirm(`Sei sicuro di voler eliminare {{ row.name or row.crew_member_name or row.tag_name or 'questo elemento' }}?`)) return; fetch('{{ table_config.delete_url.replace("{id}", row.id|string) }}', { method:'DELETE', headers:{ 'X-Requested-With':'XMLHttpRequest' } }).then(resp=>{ if (resp.ok) { const url = new URL(window.location.href); htmx.ajax('GET','{{ base_path }}/partial'+url.search, { target:'#table-content', swap:'innerHTML' }); } else { alert('Errore durante l\'eliminazione'); } });"
                             title="Elimina"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -118,16 +117,4 @@
 </div>
 {% endif %}
 
-<script>
-// Listen for delete confirmation events from the table rows
-document.addEventListener('confirm-delete', function(event) {
-    // Find the parent table container and dispatch to its Alpine component
-    const tableContainer = event.target.closest('.base-table-container');
-    if (tableContainer && tableContainer._x_dataStack) {
-        const component = tableContainer._x_dataStack[0];
-        if (component.confirmDelete) {
-            component.confirmDelete(event.detail.id, event.detail.name);
-        }
-    }
-});
-</script>
+<!-- Deleted custom delete listener; using native confirm and fetch -->

@@ -5,21 +5,27 @@
     <h2 class="base-content-title">Modifica Log</h2>
     <p class="base-content-description">Modifica i dati del log di permanenza</p>
     
-    <form method="POST" x-data="logEditForm({{ log|tojson }})">
+    <form method="POST" x-data='logEditForm({{ log|tojson }})'>
         <div class="base-form-group">
             <label>Cantiere</label>
-            <input type="text" :value="log.shipyard_name" disabled style="background-color: #f3f4f6; cursor: not-allowed;">
+            <input type="text" value="{{ log.shipyard_name|e }}" disabled style="background-color: #f3f4f6; cursor: not-allowed;">
             <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">Il cantiere non può essere modificato</p>
         </div>
         
         <div class="base-form-group">
             <label for="crew_member">Equipaggio *</label>
             <input type="text" 
-                   x-model="crewSearch" 
+                   x-model="crewSearch"
+                   @focus="searchCrewMembers()"
                    @input.debounce.500ms="searchCrewMembers()"
-                   placeholder="Cerca membro equipaggio...">
-            <select x-cloak x-model="formData.crew_member_id" x-show="crewMembers.length > 0" name="crew_member_id" required>
-                <option value="">Seleziona membro equipaggio</option>
+                   placeholder="Cerca membro equipaggio..."
+                   value="{{ log.crew_member_name|e }}">
+            <select x-model="formData.crew_member_id" x-show="crewMembers.length > 0 || crewSearch" name="crew_member_id" required>
+                <option value="">Nessun membro equipaggio</option>
+                <option disabled x-show="crewMembers.length === 0">Nessun risultato trovato</option>
+                {% if log.crew_member_id %}
+                    <option value="{{ log.crew_member_id|e }}" selected>{{ log.crew_member_name|e }}</option>
+                {% endif %}
                 <template x-for="member in crewMembers" :key="member.id">
                     <option :value="member.id" x-text="member.name" :selected="member.id == formData.crew_member_id"></option>
                 </template>
@@ -32,7 +38,8 @@
                    id="entry_timestamp" 
                    name="entry_timestamp" 
                    x-model="formData.entry_timestamp"
-                   @change="validateTimestamps()">
+                   @change="validateTimestamps()"
+                   value="{{ log.entry_timestamp.strftime('%Y-%m-%dT%H:%M') if log.entry_timestamp else '' }}">
             <p x-show="!hasValidTimestamps" class="error-message" style="color: #dc2626; font-size: 14px; margin-top: 4px;">
                 Almeno una data (entrata o uscita) è obbligatoria
             </p>
@@ -44,7 +51,8 @@
                    id="leave_timestamp" 
                    name="leave_timestamp" 
                    x-model="formData.leave_timestamp"
-                   @change="validateTimestamps()">
+                   @change="validateTimestamps()"
+                   value="{{ log.leave_timestamp.strftime('%Y-%m-%dT%H:%M') if log.leave_timestamp else '' }}">
         </div>
         
         <div class="base-form-actions">
