@@ -1241,6 +1241,18 @@ def filter_shipyards(curs):
     options = [{"value": shipyard["id"], "label": shipyard["name"]} for shipyard in shipyards]
     return jsonify({"options": options})
 
+
+import json # Rimuovi questo quando aggiorni l'endpoint con il vero codice per la gestione del json
+@app.route('/gateway-endpoint', methods=['POST'])
+def gateway_endpoint():
+    json_data = request.json
+    
+    if json_data:
+        print("JSON ricevuto:")
+        print(json.dumps(json_data, indent=2))
+    else:
+        print("Non è presente un json nella richiesta")
+
 if __name__ == "__main__":
     flask_env = get_env("FLASK_ENV")
     flask_port = int(get_env("FLASK_PORT"))
