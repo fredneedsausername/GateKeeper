@@ -1251,7 +1251,8 @@ def gateway_endpoint():
         print("JSON ricevuto:")
         print(json.dumps(json_data, indent=2))
     else:
-        print("Non è presente un json nella richiesta")
+        processed_data = request.get_data().decode('utf-8')
+        print(processed_data)
 
 if __name__ == "__main__":
     flask_env = get_env("FLASK_ENV")
