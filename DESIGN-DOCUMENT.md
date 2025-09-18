@@ -35,7 +35,11 @@ It's important to choose the right stack for the job. This robust combination en
 
 ## DB Schema
 
-CREATE DATABASE GateKeeper WITH ENCODING 'UTF8';
+```sql
+CREATE DATABASE gatekeeper WITH ENCODING 'UTF8';
+
+-- Connect to the gatekeeper database before proceeding
+\c gatekeeper;
 
 -- "users" is plural to avoid conflict with keyword USER
 CREATE TABLE IF NOT EXISTS users (
@@ -51,9 +55,9 @@ CREATE TABLE IF NOT EXISTS shipyard (
 
 CREATE TABLE IF NOT EXISTS activator_beacon (
     id SERIAL PRIMARY KEY,
-    mac_address MACADDR UNIQUE,
-    shipyard_id INTEGER,
-    is_first_when_entering BOOLEAN,
+    friendly_number INTEGER UNIQUE,
+    shipyard_id INTEGER NOT NULL,
+    is_first_when_entering BOOLEAN NOT NULL,
     CONSTRAINT fk_beacon_shipyard 
         FOREIGN KEY (shipyard_id) 
         REFERENCES shipyard(id) 
@@ -62,9 +66,16 @@ CREATE TABLE IF NOT EXISTS activator_beacon (
 
 CREATE TABLE IF NOT EXISTS tag (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(29) UNIQUE,
+    mac_address VARCHAR(12) UNIQUE,
     remaining_battery REAL,
-    packet_counter INTEGER
+    packet_counter SMALLINT DEFAULT NULL,
+    previous_echobeacon INTEGER DEFAULT NULL,
+    CONSTRAINT fk_tag_previous_beacon 
+        FOREIGN KEY (previous_echobeacon) 
+        REFERENCES activator_beacon(id) 
+        ON DELETE SET NULL,
+    CONSTRAINT chk_battery_range 
+        CHECK (remaining_battery >= 0 AND remaining_battery <= 100)
 );
 
 CREATE TABLE IF NOT EXISTS crew_member_roles (
@@ -101,7 +112,7 @@ CREATE TABLE IF NOT EXISTS crew_member (
 CREATE TABLE IF NOT EXISTS permanence_log (
     id SERIAL PRIMARY KEY,
     crew_member_id INTEGER,
-    _id INTEGER,
+    shipyard_id INTEGER,
     entry_timestamp TIMESTAMP,
     leave_timestamp TIMESTAMP,
     CONSTRAINT fk_log_crew 
@@ -118,7 +129,7 @@ CREATE TABLE IF NOT EXISTS unassigned_tag_entry (
     id SERIAL PRIMARY KEY,
     tag_id INTEGER,
     shipyard_id INTEGER,
-    advertisement_timestamp TIMESTAMP,
+    advertisement_timestamp TIMESTAMP DEFAULT NOW(),
     is_entering BOOLEAN,
     CONSTRAINT fk_entry_tag 
         FOREIGN KEY (tag_id) 
@@ -130,25 +141,85 @@ CREATE TABLE IF NOT EXISTS unassigned_tag_entry (
         ON DELETE CASCADE
 );
 
+-- Function to enforce maximum 2 activator beacons per shipyard
+CREATE OR REPLACE FUNCTION check_beacon_limit() 
+RETURNS TRIGGER AS $$
+DECLARE
+    beacon_count INTEGER;
+BEGIN
+    -- Count existing beacons for this shipyard (excluding the current record if it's an UPDATE)
+    SELECT COUNT(*) INTO beacon_count
+    FROM activator_beacon 
+    WHERE shipyard_id = NEW.shipyard_id
+    AND (TG_OP = 'INSERT' OR id != NEW.id);
+    
+    -- Check if adding/updating this beacon would exceed the limit of 2
+    IF beacon_count >= 2 THEN
+        RAISE EXCEPTION 'Cannot have more than 2 activator beacons per shipyard. Shipyard ID % already has % beacon(s).', 
+                       NEW.shipyard_id, beacon_count;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to truncate battery value to one decimal place
+CREATE OR REPLACE FUNCTION truncate_battery_decimal() 
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Round to one decimal place if the value is not NULL
+    IF NEW.remaining_battery IS NOT NULL THEN
+        NEW.remaining_battery := ROUND(NEW.remaining_battery::numeric, 1);
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to enforce the beacon limit constraint
+CREATE TRIGGER trg_beacon_limit_check
+    BEFORE INSERT OR UPDATE ON activator_beacon
+    FOR EACH ROW
+    EXECUTE FUNCTION check_beacon_limit();
+
+-- Trigger to automatically truncate battery value to one decimal place
+CREATE TRIGGER trg_battery_decimal_truncate
+    BEFORE INSERT OR UPDATE ON tag
+    FOR EACH ROW
+    EXECUTE FUNCTION truncate_battery_decimal();
+
+-- Add comments to document the constraints
+COMMENT ON TRIGGER trg_beacon_limit_check ON activator_beacon IS 
+'Ensures no more than 2 activator beacons per shipyard';
+
+COMMENT ON TRIGGER trg_battery_decimal_truncate ON tag IS 
+'Automatically rounds remaining_battery to one decimal place';
+
+COMMENT ON CONSTRAINT chk_battery_range ON tag IS 
+'Ensures remaining_battery is between 0 and 100';
+
+-- User creation and permissions
 CREATE USER your_user WITH PASSWORD 'your_strong_password';
-
-GRANT CONNECT ON DATABASE your_database_name TO your_user;
-
+GRANT CONNECT ON DATABASE gatekeeper TO your_user;
 GRANT USAGE ON SCHEMA public TO your_user;
-
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO your_user;
-
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO your_user;
+GRANT EXECUTE ON FUNCTION check_beacon_limit() TO your_user;
+GRANT EXECUTE ON FUNCTION truncate_battery_decimal() TO your_user;
 
+-- Set default privileges for future objects
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO your_user;
-
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT USAGE ON SEQUENCES TO your_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT EXECUTE ON FUNCTIONS TO your_user;
 
+-- Security restrictions
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE USAGE ON SCHEMA public FROM PUBLIC;
-REVOKE TEMPORARY ON DATABASE your_database_name FROM PUBLIC;
+REVOKE TEMPORARY ON DATABASE gatekeeper FROM PUBLIC;
+```
 
 ## Physical systems
 

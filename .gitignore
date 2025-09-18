@@ -198,3 +198,5 @@ TODO-PROJECT.md
 *.exe
 alpine.min.js
 htmx.min.js
+beacon_dump.txt
+configure_beacons/
