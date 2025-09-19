@@ -110,7 +110,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 cm.name as crew_member_name,
                 cr.role_name,
                 s.name as ship_name,
-                t.name as tag_name,
+                t.mac_address as tag_name,
                 t.remaining_battery as battery_level
             """
             
@@ -190,7 +190,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             # Base query parts
             select_fields = """
                 t.id,
-                t.name,
+                t.mac_address as name,
                 t.remaining_battery,
                 cm.name as crew_member_name
             """
@@ -214,7 +214,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             
             # Filter by tag name if provided
             if filters.get('tag_name') and filters['tag_name'].strip():
-                filter_conditions += " AND LOWER(t.name) LIKE LOWER(%s)"
+                filter_conditions += " AND LOWER(t.mac_address) LIKE LOWER(%s)"
                 params.append(f"%{filters['tag_name'].strip()}%")
             
             # Count total
@@ -237,7 +237,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             select_fields = """
                 ute.id,
                 s.name as shipyard_name,
-                t.name as tag_name,
+                t.mac_address as tag_name,
                 t.remaining_battery as battery_level,
                 ute.advertisement_timestamp,
                 CASE WHEN ute.is_entering THEN 'Ingresso' ELSE 'Uscita' END as entry_type
@@ -279,7 +279,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 params.append(int(filters['shipyard_id']))
             
             if filters.get('tag_name') and filters['tag_name'].strip():
-                filter_conditions += " AND LOWER(t.name) LIKE LOWER(%s)"
+                filter_conditions += " AND LOWER(t.mac_address) LIKE LOWER(%s)"
                 params.append(f"%{filters['tag_name'].strip()}%")
             
             # Count total
@@ -302,7 +302,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             select_fields = """
                 pl.id,
                 s.name as shipyard_name,
-                current_tag.name as current_tag_name,
+                current_tag.mac_address as current_tag_name,
                 current_tag.remaining_battery as current_battery_level,
                 ship.name as ship_name,
                 cm.name as crew_member_name,
