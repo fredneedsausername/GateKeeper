@@ -1294,8 +1294,6 @@ def print_formatted_data(mac, echo, rssi):
         beacon_dump_writer.write(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}\n")
         beacon_dump_writer.flush()
 
-packet_counter_devices = []
-
 @app.route('/gateway-endpoint', methods=['POST']) # AAAAAAA TODO IMPLEMENT THIS
 def gateway_endpoint():
     json_data = request.json
@@ -1313,15 +1311,12 @@ def gateway_endpoint():
         return "Invalid gateway message", 400
     
     for device in device_list:
-
-        same_counter = False
         
         device_data = device.get("data")
         if not device_data:
             return "Invalid gateway message", 400
         
         device_data = device_data[16:] # Skip header
-
 
         unprocessed_echobeacon_id = device_data[:4]
         packet_type = device_data[4:6]
@@ -1333,27 +1328,12 @@ def gateway_endpoint():
         if packet_type != "03":
             continue
 
-        # Don't print messages with repeated packet counter
-        found = False
-        for counter_device in packet_counter_devices:
-            if counter_device[0] != mac_address:
-                continue
-            found = True
-            if counter_device[1] != packet_counter:
-                counter_device[1] = packet_counter
-                break
-            else:
-                same_counter = True
-                break
-        if same_counter:
-            continue
-        if not found:
-            packet_counter_devices.append([mac_address, packet_counter])
-
         echobeacon_id = str(int(unprocessed_echobeacon_id, 16))
         rssi_dbm = str(int(unprocessed_rssi, 16) - 256)
 
         print_formatted_data(mac_address, echobeacon_id, rssi_dbm)
+    
+    return "Processed correctly", 200
 
 
 
