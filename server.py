@@ -1285,13 +1285,13 @@ log_lock = threading.Lock()
 beacon_dump_writer = open(log_file_path, 'a', encoding='utf-8')
 
 with log_lock:
-        beacon_dump_writer.write("mac         |echo |rssi (dbm)\n")
-        beacon_dump_writer.write("------------+-----+----------\n")
+        beacon_dump_writer.write("mac         |echo |rssi (dbm)|count\n")
+        beacon_dump_writer.write("------------+-----+----------+-----\n")
         beacon_dump_writer.flush()
 
-def print_formatted_data(mac, echo, rssi):
+def print_formatted_data(mac, echo, rssi, count):
     with log_lock:
-        beacon_dump_writer.write(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}\n")
+        beacon_dump_writer.write(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}\n")
         beacon_dump_writer.flush()
 
 @app.route('/gateway-endpoint', methods=['POST']) # AAAAAAA TODO IMPLEMENT THIS
@@ -1331,7 +1331,7 @@ def gateway_endpoint():
         echobeacon_id = str(int(unprocessed_echobeacon_id, 16))
         rssi_dbm = str(int(unprocessed_rssi, 16) - 256)
 
-        print_formatted_data(mac_address, echobeacon_id, rssi_dbm)
+        print_formatted_data(mac_address, echobeacon_id, rssi_dbm, packet_counter)
     
     return "Processed correctly", 200
 
