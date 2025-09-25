@@ -113,8 +113,8 @@ CREATE TABLE IF NOT EXISTS permanence_log (
     id SERIAL PRIMARY KEY,
     crew_member_id INTEGER,
     shipyard_id INTEGER,
-    entry_timestamp TIMESTAMP,
-    leave_timestamp TIMESTAMP,
+    entry_timestamp TIMESTAMP DEFAULT NULL,
+    leave_timestamp TIMESTAMP DEFAULT NULL,
     CONSTRAINT fk_log_crew 
         FOREIGN KEY (crew_member_id) 
         REFERENCES crew_member(id) 

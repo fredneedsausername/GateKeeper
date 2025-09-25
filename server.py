@@ -1278,24 +1278,310 @@ def filter_shipyards(curs):
 
 
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-log_file_path = os.path.join(script_dir, 'beacon_dump.txt')
-import threading
-log_lock = threading.Lock()
-beacon_dump_writer = open(log_file_path, 'a', encoding='utf-8')
 
-with log_lock:
-        beacon_dump_writer.write("mac         |echo |rssi (dbm)|count\n")
-        beacon_dump_writer.write("------------+-----+----------+-----\n")
-        beacon_dump_writer.flush()
+# script_dir = os.path.dirname(os.path.abspath(__file__))
+# log_file_path = os.path.join(script_dir, 'beacon_dump.txt')
+# import threading
+# log_lock = threading.Lock()
+# beacon_dump_writer = open(log_file_path, 'a', encoding='utf-8')
 
-def print_formatted_data(mac, echo, rssi, count):
-    with log_lock:
-        beacon_dump_writer.write(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}\n")
-        beacon_dump_writer.flush()
+# with log_lock:
+#         beacon_dump_writer.write("mac         |echo |rssi (dbm)|count\n")
+#         beacon_dump_writer.write("------------+-----+----------+-----\n")
+#         beacon_dump_writer.flush()
 
-@app.route('/gateway-endpoint', methods=['POST']) # AAAAAAA TODO IMPLEMENT THIS
+# def print_formatted_data(mac, echo, rssi, count):
+#     with log_lock:
+#         beacon_dump_writer.write(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}\n")
+#         beacon_dump_writer.flush()
+
+# @app.route('/gateway-endpoint', methods=['POST']) # AAAAAAA TODO IMPLEMENT THIS
+# def gateway_endpoint():
+#     json_data = request.json
+
+#     data = json_data.get("data")
+#     if not data:
+#         return "Invalid gateway message", 400
+
+#     value = data.get("value")
+#     if not value:
+#         return "Invalid gateway message", 400
+    
+#     device_list = value.get("device_list")
+#     if not device_list:
+#         return "Invalid gateway message", 400
+    
+#     for device in device_list:
+        
+#         device_data = device.get("data")
+#         if not device_data:
+#             return "Invalid gateway message", 400
+        
+#         device_data = device_data[16:] # Skip header
+
+#         unprocessed_echobeacon_id = device_data[:4]
+#         packet_type = device_data[4:6]
+#         packet_counter = device_data[6:8]
+#         mac_address = device_data[8:20]
+#         unprocessed_rssi = device_data[20:22]
+
+#         # Only consider echo packets
+#         if packet_type != "03":
+#             continue
+
+#         echobeacon_id = str(int(unprocessed_echobeacon_id, 16))
+#         rssi_dbm = str(int(unprocessed_rssi, 16) - 256)
+
+#         print_formatted_data(mac_address, echobeacon_id, rssi_dbm, packet_counter)
+    
+#     return "Processed correctly", 200
+
+
+
+
+# Used to determine remaining battery percentage
+BATTERY_MAX_MILLIVOLTS = 3000
+
+@connected_to_database
+def process_device(curs, device):
+
+    device_data = device.get("data")
+    if not device_data:
+        return # Invalid gateway message
+
+    device_data = device_data[16:] # Skip header
+
+    # Here device_data is a payload like 0001030F0C2A6F8A9289D1000000000000000000000000
+
+    # Consider only presence packets
+    message_type = device_data[4:6]
+    if message_type != "03":
+        return
+    
+    # Consider only Eddystone TLM packets
+    packet_payload = int(device_data[22:24], 16)
+    if not (packet_payload & 0x04):
+        return
+
+    beacon_mac_address = device_data[8:20]
+
+    packet_counter = int(device_data[6:8], 16)
+
+    # Compute remaining battery percentage
+    eddy_volt = int(device_data[24:28], 16) 
+    remaining_battery_percentage = round(eddy_volt / BATTERY_MAX_MILLIVOLTS, 1)
+
+    # Get packet counter for current beacon
+    # We also get the previous_echobeacon for future use, and we put it all in this query for efficiency in this critical server endpoint
+    curs.execute("""
+        SELECT id, packet_counter, previous_echobeacon
+        FROM tag
+        WHERE mac_address = %s
+    """, (beacon_mac_address,))
+
+    fetched = curs.fetchone()
+
+    # Register unknown tag when system comes in contact with it
+    if not fetched:
+
+        # TODO AAAAAAAAAAAAAAAAAA for now, remaining battery is zero, but when we'll be able to extrapolate it we'll also update the battery
+        curs.execute("""
+            INSERT INTO tag (mac_address, remaining_battery, packet_counter)
+            VALUES (%s, %s, %s)
+        """, (beacon_mac_address, remaining_battery_percentage, packet_counter))
+
+        # If this is the first time that the device passed through the system, then no direction can be inferred. Thus,
+        # it makes no sense to process it any further
+        return
+
+    # Can be None. If it is, no problem at all. Simply means that there is no exclusion based on packet counter number to be made
+    fetched_packet_counter = fetched.get("packet_counter")
+    
+    # Can be None. Later we'll ensure that if it is, then we ignore the message
+    previous_echobeacon = fetched.get("previous_echobeacon")
+
+    # For future use
+    beacon_id = fetched.get("id")
+
+    # If the message is repeated, then skip the read
+    if packet_counter == fetched_packet_counter:
+        return
+
+    echobeacon_id = int(device_data[0:4], 16)
+
+    # Update packet counter and last activator beacon
+    # We already cached the true value of the previous activator beacon into the variable "previous_echobeacon"
+    # TODO AAAAAAAAAAAAAA also update the battery level when you manage to extrapolate it from the data
+    curs.execute("""
+        UPDATE tag
+        SET
+            packet_counter = %s,
+            previous_echobeacon = (
+                SELECT id
+                FROM activator_beacon
+                WHERE friendly_number = %s
+            ),
+            remaining_battery = %s
+        WHERE mac_address = %s;
+    """, (packet_counter, echobeacon_id, remaining_battery_percentage, beacon_mac_address))
+
+    # Now we have ensured that the message is original, and that all the preprocessing has taken place
+
+    # ----- PROCESS MESSAGE -----
+
+    # We exclude messages that don't have a previous echobeacon, because no direction can be inferred
+    if not previous_echobeacon:
+        return
+
+    # We exclude messages where the previous echobeacon and the current one are the same
+    if previous_echobeacon == echobeacon_id:
+        return
+    
+    # We get info about the activator beacons to use it in the message processing steps
+    curs.execute("""
+        SELECT shipyard_id, is_first_when_entering
+        FROM activator_beacon
+        WHERE friendly_number = %s
+    """, (echobeacon_id,))
+
+    fetched = curs.fetchone()
+
+    # If the echobeacon is not registered, skip processing. We assume that all echobeacons are correctly registered,
+    # so if a message comes from an unrecognized echobeacon it's not something that has to do with us.
+    if not fetched: 
+        return
+
+    current_shipyard_id = fetched.get("shipyard_id")                        # Not null and without defaults
+    current_is_first_when_entering = fetched.get("is_first_when_entering")  # Not null and without defaults
+
+    # We get the shipyard of the previous echobeacon, to compare it with the current one
+    # We can deduce the direction information without is_first_when_entering
+    curs.execute("""
+        SELECT shipyard_id
+        FROM activator_beacon
+        WHERE friendly_number = %s
+    """, (previous_echobeacon,))
+
+    fetched = curs.fetchone()
+
+    # If the previous activator beacon got eliminated in the meanwhile, skip processing. That's because
+    # we cannot deduce a direction.
+    if not fetched:
+        return
+
+    previous_shipyard_id = fetched.get("shipyard_id")
+
+    # If the previous echobeacon comes from a different shipyard, it makes no sense to deduce a direction out of it
+    if current_shipyard_id != previous_shipyard_id:
+        return
+    
+    # Now we are sure that the activator beacons are different and from the same shipyard: we can deduce a direction.
+    is_direction_entering = None
+
+    if current_is_first_when_entering:
+        is_direction_entering = False
+    else:
+        is_direction_entering = True
+
+    # ----- DETERMINE EVENT TYPE (entry or log) -----
+
+    is_entry = None
+
+    curs.execute("""
+        SELECT id
+        FROM crew_member
+        WHERE tag_id = %s
+    """, (beacon_id,))
+
+    fetched = curs.fetchone()
+
+    # If no crew member has ownership of the tag, then it is an unassigned tag entry, else it is a log
+    if not fetched:
+        is_entry = True
+    else:
+        is_entry = False
+        crew_member_id = fetched.get("id")
+    
+    # --- Register event in database ---
+
+    if is_entry:
+        curs.execute("""
+            INSERT INTO unassigned_tag_entry (tag_id, shipyard_id, is_entering)
+            VALUES (%s, %s, %s)
+        """, (beacon_id, current_shipyard_id, is_direction_entering))
+
+        # Finished processing
+        return
+    
+    else:
+
+        # Check if the most recent log of the crew member, that is from the same shipyard exists, is open, or closed
+        curs.execute("""
+            SELECT entry_timestamp, leave_timestamp
+            FROM permanence_log
+            WHERE
+                shipyard_id = %s AND
+                crew_member_id = %s
+            ORDER BY GREATEST(entry_timestamp, leave_timestamp) DESC NULLS LAST
+            LIMIT 1;
+        """, (current_shipyard_id, crew_member_id))
+
+        # To understand whether the log is open or closed we look at the timestamps
+
+        fetched = curs.fetchone()
+
+        exists = bool(fetched)
+
+        if exists:
+            is_open = bool(fetched.get("entry_timestamp"))
+            is_closed = bool(fetched.get("leave_timestamp"))
+
+        if is_direction_entering:
+            curs.execute("""
+                INSERT INTO permanence_log (
+                    crew_member_id,
+                    shipyard_id,
+                    entry_timestamp
+                ) VALUES (
+                    %s,
+                    %s,
+                    NOW()
+                )
+            """, (crew_member_id, current_shipyard_id))
+        else:
+            # We infer that it is open, using a short-circuit evalutation
+            if exists and (not is_closed):
+                curs.execute("""
+                    UPDATE permanence_log
+                    SET leave_timestamp = NOW()
+                    WHERE id = (
+                        SELECT id
+                        FROM permanence_log
+                        WHERE
+                            crew_member_id = %s AND
+                            shipyard_id = %s
+                        ORDER BY GREATEST(entry_timestamp, leave_timestamp) DESC NULLS LAST
+                        LIMIT 1;
+                    )
+                """)
+            else:
+                curs.execute("""
+                    INSERT INTO permanence_log (
+                        crew_member_id,
+                        shipyard_id,
+                        leave_timestamp
+                    ) VALUES (
+                        %s,
+                        %s,
+                        NOW()
+                    )
+                """, (crew_member_id, current_shipyard_id))
+
+        return
+
+@app.route('/gateway-endpoint', methods=['POST'])
 def gateway_endpoint():
+
     json_data = request.json
 
     data = json_data.get("data")
@@ -1310,235 +1596,14 @@ def gateway_endpoint():
     if not device_list:
         return "Invalid gateway message", 400
     
+    # From here on out the order of the lines of code is quirky
+    # This is intentional: things appear in the order that makes for the fastest execution
+    # That can only be done if we study the order of the instructions to make the ones that command the exit conditions first
+
     for device in device_list:
-        
-        device_data = device.get("data")
-        if not device_data:
-            return "Invalid gateway message", 400
-        
-        device_data = device_data[16:] # Skip header
+        process_device(device)
 
-        unprocessed_echobeacon_id = device_data[:4]
-        packet_type = device_data[4:6]
-        packet_counter = device_data[6:8]
-        mac_address = device_data[8:20]
-        unprocessed_rssi = device_data[20:22]
-
-        # Only consider echo packets
-        if packet_type != "03":
-            continue
-
-        echobeacon_id = str(int(unprocessed_echobeacon_id, 16))
-        rssi_dbm = str(int(unprocessed_rssi, 16) - 256)
-
-        print_formatted_data(mac_address, echobeacon_id, rssi_dbm, packet_counter)
-    
-    return "Processed correctly", 200
-
-
-
-# # # # # # # # # # # Used to determine remaining battery percentage
-# # # # # # # # # # battery_max_millivolts = 3000
-
-# # # # # # # # # # @connected_to_database
-# # # # # # # # # # def process_device(curs, device):
-
-# # # # # # # # # #     device_data = device.get("data")
-# # # # # # # # # #     if not device_data:
-# # # # # # # # # #         return # Invalid gateway message
-
-# # # # # # # # # #     device_data = device_data[16:] # Skip header
-
-# # # # # # # # # #     # Here device_data is a payload like 0001030F0C2A6F8A9289D1000000000000000000000000
-
-# # # # # # # # # #     # Consider only presence packets
-# # # # # # # # # #     message_type = device_data[4:6]
-# # # # # # # # # #     if message_type != "03":
-# # # # # # # # # #         return
-    
-# # # # # # # # # #     # Consider only Eddystone TLM packets
-# # # # # # # # # #     packet_payload = int(device_data[22:24], 16)
-# # # # # # # # # #     if not (packet_payload & 0x04):
-# # # # # # # # # #         return
-
-# # # # # # # # # #     beacon_mac_address = device_data[8:20]
-
-# # # # # # # # # #     packet_counter = int(device_data[6:8], 16)
-
-# # # # # # # # # #     # Compute remaining battery percentage
-# # # # # # # # # #     eddy_volt = int(device_data[24:28], 16) 
-# # # # # # # # # #     remaining_battery_percentage = round(eddy_volt / battery_max_millivolts, 1)
-
-# # # # # # # # # #     # Get packet counter for current beacon
-# # # # # # # # # #     # We also get the previous_echobeacon for future use, and we put it all in this query for efficiency in this critical server endpoint
-# # # # # # # # # #     curs.execute("""
-# # # # # # # # # #         SELECT id, packet_counter, previous_echobeacon
-# # # # # # # # # #         FROM tag
-# # # # # # # # # #         WHERE mac_address = %s
-# # # # # # # # # #     """, (beacon_mac_address,))
-
-# # # # # # # # # #     fetched = curs.fetchone()
-
-# # # # # # # # # #     # Register unknown tag when system comes in contact with it
-# # # # # # # # # #     if not fetched:
-
-# # # # # # # # # #         # TODO AAAAAAAAAAAAAAAAAA for now, remaining battery is zero, but when we'll be able to extrapolate it we'll also update the battery
-# # # # # # # # # #         curs.execute("""
-# # # # # # # # # #             INSERT INTO tag (mac_address, remaining_battery, packet_counter)
-# # # # # # # # # #             VALUES (%s, %s, %s)
-# # # # # # # # # #         """, (beacon_mac_address, remaining_battery_percentage, packet_counter))
-
-# # # # # # # # # #         # If this is the first time that the device passed through the system, then no direction can be inferred. Thus,
-# # # # # # # # # #         # it makes no sense to process it any further
-# # # # # # # # # #         return
-
-# # # # # # # # # #     # Can be None. If it is, no problem at all. Simply means that there is no exclusion based on packet counter number to be made
-# # # # # # # # # #     fetched_packet_counter = fetched.get("packet_counter")
-    
-# # # # # # # # # #     # Can be None. Later we'll ensure that if it is, then we ignore the message
-# # # # # # # # # #     previous_echobeacon = fetched.get("previous_echobeacon")
-
-# # # # # # # # # #     # For future use
-# # # # # # # # # #     beacon_id = fetched.get("id")
-
-# # # # # # # # # #     # If the message is repeated, then skip the read
-# # # # # # # # # #     if packet_counter == fetched_packet_counter:
-# # # # # # # # # #         return
-
-# # # # # # # # # #     echobeacon_id = int(device_data[0:4], 16)
-
-# # # # # # # # # #     # Update packet counter and last activator beacon
-# # # # # # # # # #     # We already cached the true value of the previous activator beacon into the variable "previous_echobeacon"
-# # # # # # # # # #     # TODO AAAAAAAAAAAAAA also update the battery level when you manage to extrapolate it from the data
-# # # # # # # # # #     curs.execute("""
-# # # # # # # # # #         UPDATE tag
-# # # # # # # # # #         SET
-# # # # # # # # # #             packet_counter = %s,
-# # # # # # # # # #             previous_echobeacon = (
-# # # # # # # # # #                 SELECT id
-# # # # # # # # # #                 FROM activator_beacon
-# # # # # # # # # #                 WHERE friendly_number = %s
-# # # # # # # # # #             ),
-# # # # # # # # # #             remaining_battery = %s
-# # # # # # # # # #         WHERE mac_address = %s;
-# # # # # # # # # #     """, (packet_counter, echobeacon_id, remaining_battery_percentage, beacon_mac_address))
-
-# # # # # # # # # #     # Now we have ensured that the message is original, and that all the preprocessing has taken place
-
-# # # # # # # # # #     # ----- PROCESS MESSAGE -----
-
-# # # # # # # # # #     # We exclude messages that don't have a previous echobeacon, because no direction can be inferred
-# # # # # # # # # #     if not previous_echobeacon:
-# # # # # # # # # #         return
-
-# # # # # # # # # #     # We exclude messages where the previous echobeacon and the current one are the same
-# # # # # # # # # #     if previous_echobeacon == echobeacon_id:
-# # # # # # # # # #         return
-    
-# # # # # # # # # #     # We get info about the activator beacons to use it in the message processing steps
-# # # # # # # # # #     curs.execute("""
-# # # # # # # # # #         SELECT shipyard_id, is_first_when_entering
-# # # # # # # # # #         FROM activator_beacon
-# # # # # # # # # #         WHERE friendly_number = %s
-# # # # # # # # # #     """, (echobeacon_id,))
-
-# # # # # # # # # #     fetched = curs.fetchone()
-
-# # # # # # # # # #     # If the echobeacon is not registered, skip processing. We assume that all echobeacons are correctly registered,
-# # # # # # # # # #     # so if a message comes from an unrecognized echobeacon it's not something that has to do with us.
-# # # # # # # # # #     if not fetched: 
-# # # # # # # # # #         return
-
-# # # # # # # # # #     current_shipyard_id = fetched.get("shipyard_id")                        # Not null and without defaults
-# # # # # # # # # #     current_is_first_when_entering = fetched.get("is_first_when_entering")  # Not null and without defaults
-
-# # # # # # # # # #     # We get the shipyard of the previous echobeacon, to compare it with the current one
-# # # # # # # # # #     # We can deduce the direction information without is_first_when_entering
-# # # # # # # # # #     curs.execute("""
-# # # # # # # # # #         SELECT shipyard_id
-# # # # # # # # # #         FROM activator_beacon
-# # # # # # # # # #         WHERE friendly_number = %s
-# # # # # # # # # #     """, (previous_echobeacon,))
-
-# # # # # # # # # #     fetched = curs.fetchone()
-
-# # # # # # # # # #     # If the previous activator beacon got eliminated in the meanwhile, skip processing. That's because
-# # # # # # # # # #     # we cannot deduce a direction.
-# # # # # # # # # #     if not fetched:
-# # # # # # # # # #         return
-
-# # # # # # # # # #     previous_shipyard_id = fetched.get("shipyard_id")
-
-# # # # # # # # # #     # If the previous echobeacon comes from a different shipyard, it makes no sense to deduce a direction out of it
-# # # # # # # # # #     if current_shipyard_id != previous_shipyard_id:
-# # # # # # # # # #         return
-    
-# # # # # # # # # #     # Now we are sure that the activator beacons are different and from the same shipyard: we can deduce a direction.
-# # # # # # # # # #     is_direction_entering = None
-
-# # # # # # # # # #     if current_is_first_when_entering:
-# # # # # # # # # #         is_direction_entering = False
-# # # # # # # # # #     else:
-# # # # # # # # # #         is_direction_entering = True
-
-# # # # # # # # # #     # ----- DETERMINE EVENT TYPE (entry or log) -----
-
-# # # # # # # # # #     is_entry = None
-
-# # # # # # # # # #     curs.execute("""
-# # # # # # # # # #         SELECT id
-# # # # # # # # # #         FROM crew_member
-# # # # # # # # # #         WHERE tag_id = %s
-# # # # # # # # # #     """, (beacon_id,))
-
-# # # # # # # # # #     fetched = curs.fetchone()
-
-# # # # # # # # # #     # If no crew member has ownership of the tag, then it is an unassigned tag entry, else it is a log
-# # # # # # # # # #     if not fetched:
-# # # # # # # # # #         is_entry = True
-# # # # # # # # # #     else:
-# # # # # # # # # #         is_entry = False
-    
-# # # # # # # # # #     # --- Register event in database ---
-
-# # # # # # # # # #     if is_entry:
-# # # # # # # # # #         curs.execute("""
-# # # # # # # # # #             INSERT INTO unassigned_tag_entry (tag_id, shipyard_id, is_entering)
-# # # # # # # # # #             VALUES (%s, %s, %s)
-# # # # # # # # # #         """, (beacon_id, current_shipyard_id, is_direction_entering))
-
-# # # # # # # # # #         # Finished processing
-# # # # # # # # # #         return
-    
-# # # # # # # # # #     else:
-# # # # # # # # # #         # TODO AAAAAAAAAAAAAAAAA implement permanence log logic
-# # # # # # # # # #         raise Exception
-
-# # # # # # # # # # @app.route('/gateway-endpoint', methods=['POST'])
-# # # # # # # # # # def gateway_endpoint():
-
-# # # # # # # # # #     json_data = request.json
-
-# # # # # # # # # #     data = json_data.get("data")
-# # # # # # # # # #     if not data:
-# # # # # # # # # #         return "Invalid gateway message", 400
-
-# # # # # # # # # #     value = data.get("value")
-# # # # # # # # # #     if not value:
-# # # # # # # # # #         return "Invalid gateway message", 400
-    
-# # # # # # # # # #     device_list = value.get("device_list")
-# # # # # # # # # #     if not device_list:
-# # # # # # # # # #         return "Invalid gateway message", 400
-    
-# # # # # # # # # #     # From here on out the order of the lines of code is quirky
-# # # # # # # # # #     # This is intentional: things appear in the order that makes for the fastest execution
-# # # # # # # # # #     # That can only be done if we study the order of the instructions to make the ones that command the exit conditions first
-
-# # # # # # # # # #     for device in device_list:
-# # # # # # # # # #         process_device(device)
-
-# # # # # # # # # #     return "Processed", 200
+    return "Processed", 200
 
 
 if __name__ == "__main__":
