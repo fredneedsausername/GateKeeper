@@ -1295,7 +1295,7 @@ def filter_shipyards(curs):
 #         beacon_dump_writer.write(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}\n")
 #         beacon_dump_writer.flush()
 
-# @app.route('/gateway-endpoint', methods=['POST']) # AAAAAAA TODO IMPLEMENT THIS
+# @app.route('/gateway-endpoint', methods=['POST'])
 # def gateway_endpoint():
 #     json_data = request.json
 
@@ -1384,7 +1384,6 @@ def process_device(curs, device):
     # Register unknown tag when system comes in contact with it
     if not fetched:
 
-        # TODO AAAAAAAAAAAAAAAAAA for now, remaining battery is zero, but when we'll be able to extrapolate it we'll also update the battery
         curs.execute("""
             INSERT INTO tag (mac_address, remaining_battery, packet_counter)
             VALUES (%s, %s, %s)
@@ -1411,7 +1410,6 @@ def process_device(curs, device):
 
     # Update packet counter and last activator beacon
     # We already cached the true value of the previous activator beacon into the variable "previous_echobeacon"
-    # TODO AAAAAAAAAAAAAA also update the battery level when you manage to extrapolate it from the data
     curs.execute("""
         UPDATE tag
         SET
@@ -1533,7 +1531,6 @@ def process_device(curs, device):
         exists = bool(fetched)
 
         if exists:
-            is_open = bool(fetched.get("entry_timestamp"))
             is_closed = bool(fetched.get("leave_timestamp"))
 
         if is_direction_entering:
