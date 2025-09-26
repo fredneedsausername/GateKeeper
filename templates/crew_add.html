@@ -100,6 +100,10 @@ function crewForm() {
                     body: JSON.stringify({ query: query })
                 });
                 
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
                 const data = await response.json();
                 this.ships = data.ships || [];
             } catch (error) {
@@ -121,6 +125,10 @@ function crewForm() {
                     body: JSON.stringify({ query: query })
                 });
                 
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
                 const data = await response.json();
                 this.roles = data.roles || [];
             } catch (error) {
@@ -141,6 +149,10 @@ function crewForm() {
                     },
                     body: JSON.stringify({ query: query, current_tag_id: this.formData.tag_id || null })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 
                 const data = await response.json();
                 this.tags = data.tags || [];

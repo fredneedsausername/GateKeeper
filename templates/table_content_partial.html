@@ -66,7 +66,7 @@
                         {% if table_config.allow_delete %}
                         <button
                             class="base-action-button base-delete"
-                            @click.prevent="if (!confirm(`Sei sicuro di voler eliminare {{ row.name or row.crew_member_name or row.tag_name or 'questo elemento' }}?`)) return; fetch('{{ table_config.delete_url.replace("{id}", row.id|string) }}', { method:'DELETE', headers:{ 'X-Requested-With':'XMLHttpRequest' } }).then(resp=>{ if (resp.ok) { const url = new URL(window.location.href); htmx.ajax('GET','{{ base_path }}/partial'+url.search, { target:'#table-content', swap:'innerHTML' }); } else { alert('Errore durante l\'eliminazione'); } });"
+                            @click.prevent="if (!confirm('Sei sicuro di voler eliminare {{ (row.name or row.crew_member_name or row.tag_name or 'questo elemento')|e }}?')) return; fetch('{{ table_config.delete_url.replace("{id}", row.id|string) }}', { method:'DELETE', headers:{ 'X-Requested-With':'XMLHttpRequest' } }).then(resp=>{ if (resp.ok) { const url = new URL(window.location.href); htmx.ajax('GET','{{ base_path }}/partial'+url.search, { target:'#table-content', swap:'innerHTML' }); } else { alert('Errore durante l\'eliminazione'); } });"
                             title="Elimina"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -7,6 +7,7 @@ from functools import wraps
 from datetime import datetime, timedelta
 import base64
 from typing import TypeVar, ParamSpec, Callable, Concatenate, Any
+import psycopg
 
 # Type variables for typing the decorator
 P = ParamSpec('P')
@@ -134,12 +135,20 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 params.append(f"%{filters['ship_name'].strip()}%")
             
             if filters.get('role_id') and filters['role_id'].strip():
-                filter_conditions += " AND cm.role_id = %s"
-                params.append(int(filters['role_id']))
+                try:
+                    role_id = int(filters['role_id'])
+                    filter_conditions += " AND cm.role_id = %s"
+                    params.append(role_id)
+                except ValueError:
+                    pass  # Skip invalid filter
             
             if filters.get('ship_id') and filters['ship_id'].strip():
-                filter_conditions += " AND cm.ship_id = %s"
-                params.append(int(filters['ship_id']))
+                try:
+                    ship_id = int(filters['ship_id'])
+                    filter_conditions += " AND cm.ship_id = %s"
+                    params.append(ship_id)
+                except ValueError:
+                    pass  # Skip invalid filter
             
             # Count total
             count_query = f"SELECT COUNT(*) as count {from_where} {filter_conditions}"
@@ -275,8 +284,12 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 params.append(end_ts)
             
             if filters.get('shipyard_id') and filters['shipyard_id'].strip():
-                filter_conditions += " AND ute.shipyard_id = %s"
-                params.append(int(filters['shipyard_id']))
+                try:
+                    shipyard_id = int(filters['shipyard_id'])
+                    filter_conditions += " AND ute.shipyard_id = %s"
+                    params.append(shipyard_id)
+                except ValueError:
+                    pass  # Skip invalid filter
             
             if filters.get('tag_name') and filters['tag_name'].strip():
                 filter_conditions += " AND LOWER(t.mac_address) LIKE LOWER(%s)"
@@ -350,12 +363,20 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 params.extend([end_ts, start_ts, start_ts, end_ts])
             
             if filters.get('shipyard_id') and filters['shipyard_id'].strip():
-                filter_conditions += " AND pl.shipyard_id = %s"
-                params.append(int(filters['shipyard_id']))
+                try:
+                    shipyard_id = int(filters['shipyard_id'])
+                    filter_conditions += " AND pl.shipyard_id = %s"
+                    params.append(shipyard_id)
+                except ValueError:
+                    pass  # Skip invalid filter
             
             if filters.get('ship_id') and filters['ship_id'].strip():
-                filter_conditions += " AND cm.ship_id = %s"
-                params.append(int(filters['ship_id']))
+                try:
+                    ship_id = int(filters['ship_id'])
+                    filter_conditions += " AND cm.ship_id = %s"
+                    params.append(ship_id)
+                except ValueError:
+                    pass  # Skip invalid filter
             
             if filters.get('crew_name') and filters['crew_name'].strip():
                 filter_conditions += " AND LOWER(cm.name) LIKE LOWER(%s)"
@@ -590,6 +611,9 @@ def login_get():
 @connected_to_database
 def login_post(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     username = data.get('username')
     password = data.get('password')
     curs.execute("SELECT username FROM users WHERE username=%s AND password=%s", (username, password))
@@ -652,19 +676,21 @@ def add_crew(curs):
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
-            # Enforce that a tag can only be assigned to one crew member
-            if tag_id:
-                curs.execute("SELECT COUNT(*) as count FROM crew_member WHERE tag_id = %s", [tag_id])
-                result = curs.fetchone()
-                if result and result['count'] > 0:
-                    flash('Tag già assegnato a un altro membro dell\'equipaggio', 'error')
-                    return redirect(request.url)
-            curs.execute(
-                "INSERT INTO crew_member (name, ship_id, role_id, tag_id) VALUES (%s, %s, %s, %s)",
-                [name, ship_id, role_id, tag_id]
-            )
-            flash('Crew member aggiunto con successo', 'success')
-            return redirect('/crew')
+            
+            # Use database constraint to enforce tag uniqueness
+            try:
+                curs.execute(
+                    "INSERT INTO crew_member (name, ship_id, role_id, tag_id) VALUES (%s, %s, %s, %s)",
+                    [name, ship_id, role_id, tag_id]
+                )
+                flash('Crew member aggiunto con successo', 'success')
+                return redirect('/crew')
+            except psycopg.IntegrityError:
+                flash('Tag già assegnato a un altro membro dell\'equipaggio', 'error')
+                return redirect(request.url)
+        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+            flash(f'Errore database: {str(e)}', 'error')
+            return redirect(request.url)
         except Exception as e:
             flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
             return redirect(request.url)
@@ -683,19 +709,21 @@ def edit_crew(curs, crew_id):
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
-            # Enforce that a tag can only be assigned to one crew member except itself
-            if tag_id:
-                curs.execute("SELECT COUNT(*) as count FROM crew_member WHERE tag_id = %s AND id != %s", [tag_id, crew_id])
-                result = curs.fetchone()
-                if result and result['count'] > 0:
-                    flash('Tag già assegnato a un altro membro dell\'equipaggio', 'error')
-                    return redirect(request.url)
-            curs.execute(
-                "UPDATE crew_member SET name = %s, ship_id = %s, role_id = %s, tag_id = %s WHERE id = %s",
-                [name, ship_id, role_id, tag_id, crew_id]
-            )
-            flash('Crew member aggiornato con successo', 'success')
-            return redirect('/crew')
+            
+            # Use database constraint to enforce tag uniqueness
+            try:
+                curs.execute(
+                    "UPDATE crew_member SET name = %s, ship_id = %s, role_id = %s, tag_id = %s WHERE id = %s",
+                    [name, ship_id, role_id, tag_id, crew_id]
+                )
+                flash('Crew member aggiornato con successo', 'success')
+                return redirect('/crew')
+            except psycopg.IntegrityError:
+                flash('Tag già assegnato a un altro membro dell\'equipaggio', 'error')
+                return redirect(request.url)
+        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+            flash(f'Errore database: {str(e)}', 'error')
+            return redirect(request.url)
         except Exception as e:
             flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
             return redirect(request.url)
@@ -722,6 +750,8 @@ def delete_crew(curs, crew_id):
     try:
         curs.execute("DELETE FROM crew_member WHERE id = %s", [crew_id])
         return jsonify({"success": True, "message": "Crew member eliminato con successo"})
+    except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+        return jsonify({"success": False, "error": f"Errore database: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -764,6 +794,9 @@ def add_ship(curs):
             curs.execute("INSERT INTO ship (name) VALUES (%s)", [name])
             flash('Nave aggiunta con successo', 'success')
             return redirect('/navi')
+        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+            flash(f'Errore database: {str(e)}', 'error')
+            return redirect(request.url)
         except Exception as e:
             flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
             return redirect(request.url)
@@ -782,6 +815,9 @@ def edit_ship(curs, ship_id):
             curs.execute("UPDATE ship SET name = %s WHERE id = %s", [name, ship_id])
             flash('Nave aggiornata con successo', 'success')
             return redirect('/navi')
+        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+            flash(f'Errore database: {str(e)}', 'error')
+            return redirect(request.url)
         except Exception as e:
             flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
             return redirect(request.url)
@@ -800,6 +836,8 @@ def delete_ship(curs, ship_id):
     try:
         curs.execute("DELETE FROM ship WHERE id = %s", [ship_id])
         return jsonify({"success": True, "message": "Nave eliminata con successo"})
+    except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+        return jsonify({"success": False, "error": f"Errore database: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -856,6 +894,9 @@ def add_tag(curs):
                 curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", [tag_id, crew_member_id])
             flash('Tag aggiunto con successo', 'success')
             return redirect('/tag')
+        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+            flash(f'Errore database: {str(e)}', 'error')
+            return redirect(request.url)
         except Exception as e:
             flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
             return redirect(request.url)
@@ -883,6 +924,9 @@ def edit_tag(curs, tag_id):
                 curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", [tag_id, crew_member_id])
             flash('Tag aggiornato con successo', 'success')
             return redirect('/tag')
+        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+            flash(f'Errore database: {str(e)}', 'error')
+            return redirect(request.url)
         except Exception as e:
             flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
             return redirect(request.url)
@@ -907,6 +951,8 @@ def delete_tag(curs, tag_id):
     try:
         curs.execute("DELETE FROM tag WHERE id = %s", [tag_id])
         return jsonify({"success": True, "message": "Tag eliminato con successo"})
+    except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+        return jsonify({"success": False, "error": f"Errore database: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -950,6 +996,8 @@ def delete_entry(curs, entry_id):
     try:
         curs.execute("DELETE FROM unassigned_tag_entry WHERE id = %s", [entry_id])
         return jsonify({"success": True, "message": "Entry eliminata con successo"})
+    except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+        return jsonify({"success": False, "error": f"Errore database: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1009,6 +1057,9 @@ def add_log(curs):
             )
             flash('Log aggiunto con successo', 'success')
             return redirect('/log')
+        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+            flash(f'Errore database: {str(e)}', 'error')
+            return redirect(request.url)
         except Exception as e:
             flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
             return redirect(request.url)
@@ -1035,6 +1086,9 @@ def edit_log(curs, log_id):
             )
             flash('Log aggiornato con successo', 'success')
             return redirect('/log')
+        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+            flash(f'Errore database: {str(e)}', 'error')
+            return redirect(request.url)
         except Exception as e:
             flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
             return redirect(request.url)
@@ -1060,6 +1114,8 @@ def delete_log(curs, log_id):
     try:
         curs.execute("DELETE FROM permanence_log WHERE id = %s", [log_id])
         return jsonify({"success": True, "message": "Log eliminato con successo"})
+    except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
+        return jsonify({"success": False, "error": f"Errore database: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1070,6 +1126,9 @@ def delete_log(curs, log_id):
 @connected_to_database
 def search_ships(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     query = data.get('query', '').strip()
     
     # Remove the 2-character minimum requirement
@@ -1086,6 +1145,9 @@ def search_ships(curs):
 @connected_to_database
 def search_roles(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     query = data.get('query', '').strip()
     
     # Remove the 2-character minimum requirement
@@ -1102,6 +1164,9 @@ def search_roles(curs):
 @connected_to_database
 def search_tags(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     query = data.get('query', '').strip()
     current_tag_id = data.get('current_tag_id') or None
 
@@ -1134,6 +1199,9 @@ def search_tags(curs):
 @connected_to_database
 def search_crew(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     query = data.get('query', '').strip()
     
     # Remove the 2-character minimum requirement
@@ -1150,6 +1218,9 @@ def search_crew(curs):
 @connected_to_database
 def search_shipyards(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     query = data.get('query', '').strip()
     
     # Remove the 2-character minimum requirement
@@ -1168,6 +1239,9 @@ def search_shipyards(curs):
 @connected_to_database
 def filter_ships(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     query = data.get('query', '').strip()
     selected_id = data.get('selected_id')
     
@@ -1194,6 +1268,9 @@ def filter_ships(curs):
 @connected_to_database
 def filter_roles(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     query = data.get('query', '').strip()
     selected_id = data.get('selected_id')
     
@@ -1220,6 +1297,9 @@ def filter_roles(curs):
 @connected_to_database
 def filter_shipyards(curs):
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+        
     query = data.get('query', '').strip()
     selected_id = data.get('selected_id')
     
@@ -1350,6 +1430,10 @@ def process_device(curs, device):
 
     device_data = device_data[16:] # Skip header
 
+    # Validate data length
+    if len(device_data) < 28:
+        return  # Invalid data length
+
     # Here device_data is a payload like 0001030F0C2A6F8A9289D1000000000000000000000000
 
     # Consider only presence packets
@@ -1367,7 +1451,7 @@ def process_device(curs, device):
 
     # Compute remaining battery percentage
     eddy_volt = int(device_data[24:28], 16) 
-    remaining_battery_percentage = round(eddy_volt / BATTERY_MAX_MILLIVOLTS, 1)
+    remaining_battery_percentage = round((eddy_volt / BATTERY_MAX_MILLIVOLTS) * 100, 1)
 
     echobeacon_id = int(device_data[0:4], 16)
 

@@ -153,6 +153,11 @@ function searchSelectFilter(filterKey, searchEndpoint) {
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({query: query})
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
                 const data = await response.json();
                 this.options = data.options || [];
             } catch (error) {

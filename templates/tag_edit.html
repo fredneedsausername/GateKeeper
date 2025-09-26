@@ -67,6 +67,10 @@ function tagEditForm(existingData) {
                     body: JSON.stringify({ query: query })
                 });
                 
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
                 const data = await response.json();
                 this.crewMembers = data.crew_members || [];
             } catch (error) {
