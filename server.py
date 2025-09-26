@@ -42,9 +42,17 @@ def connected_to_database(fn: Callable[Concatenate[CursorType, P], R]) -> Callab
     def wrapped_function(*args: P.args, **kwargs: P.kwargs) -> R:
         with db_pool.connection() as conn:
             with conn.cursor() as curs:
-                ret = fn(curs, *args, **kwargs)
-                conn.commit()
-        return ret
+                try:
+                    # Explicitly start transaction
+                    conn.execute("BEGIN")
+                    ret = fn(curs, *args, **kwargs)
+                    # Commit transaction on success
+                    conn.commit()
+                    return ret
+                except Exception:
+                    # Rollback transaction on any error
+                    conn.rollback()
+                    raise
     return wrapped_function
 
 app = Flask(__name__)

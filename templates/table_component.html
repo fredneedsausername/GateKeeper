@@ -134,24 +134,33 @@ function gateKeeperTable() {
     };
 }
 
-// Search Select Filter component (mimics crew_add behavior)
+// Search Select Filter component with race condition fix
 function searchSelectFilter(filterKey, searchEndpoint) {
     return {
         searchText: '',
         selectedValue: '',
         options: [],
+        searchController: null,
+        
         async searchOptions() {
+            if (this.searchController) {
+                this.searchController.abort();
+            }
+            this.searchController = new AbortController();
+            
             const query = this.searchText.trim();
             if (!query) {
                 this.options = [];
                 this.selectedValue = '';
                 return;
             }
+            
             try {
                 const response = await fetch(searchEndpoint, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({query: query})
+                    body: JSON.stringify({query: query}),
+                    signal: this.searchController.signal
                 });
                 
                 if (!response.ok) {
@@ -161,8 +170,13 @@ function searchSelectFilter(filterKey, searchEndpoint) {
                 const data = await response.json();
                 this.options = data.options || [];
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
                 console.error('Search error:', error);
                 this.options = [];
+            } finally {
+                this.searchController = null;
             }
         }
     };

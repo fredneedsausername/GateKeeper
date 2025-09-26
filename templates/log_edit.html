@@ -81,6 +81,7 @@ function logEditForm(existingData) {
         crewSearch: existingData.crew_member_name || '',
         crewMembers: existingData.crew_member_name ? [{id: existingData.crew_member_id, name: existingData.crew_member_name}] : [],
         hasValidTimestamps: true,
+        crewSearchController: null,
         
         get isFormValid() {
             return this.formData.crew_member_id && 
@@ -92,7 +93,11 @@ function logEditForm(existingData) {
         },
         
         async searchCrewMembers() {
-            // Remove the length check - search immediately with any input
+            if (this.crewSearchController) {
+                this.crewSearchController.abort();
+            }
+            this.crewSearchController = new AbortController();
+            
             const query = this.crewSearch.trim();
             
             try {
@@ -101,7 +106,8 @@ function logEditForm(existingData) {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query }),
+                    signal: this.crewSearchController.signal
                 });
                 
                 if (!response.ok) {
@@ -111,8 +117,13 @@ function logEditForm(existingData) {
                 const data = await response.json();
                 this.crewMembers = data.crew_members || [];
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
                 console.error('Crew search error:', error);
                 this.crewMembers = [];
+            } finally {
+                this.crewSearchController = null;
             }
         }
     }

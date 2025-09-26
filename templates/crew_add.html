@@ -86,9 +86,16 @@ function crewForm() {
         ships: [],
         roles: [],
         tags: [],
+        shipSearchController: null,
+        roleSearchController: null,
+        tagSearchController: null,
         
         async searchShips() {
-            // Remove the length check - search immediately with any input
+            if (this.shipSearchController) {
+                this.shipSearchController.abort();
+            }
+            this.shipSearchController = new AbortController();
+            
             const query = this.shipSearch.trim();
             
             try {
@@ -97,7 +104,8 @@ function crewForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query }),
+                    signal: this.shipSearchController.signal
                 });
                 
                 if (!response.ok) {
@@ -107,13 +115,22 @@ function crewForm() {
                 const data = await response.json();
                 this.ships = data.ships || [];
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
                 console.error('Ship search error:', error);
                 this.ships = [];
+            } finally {
+                this.shipSearchController = null;
             }
         },
         
         async searchRoles() {
-            // Remove the length check - search immediately with any input
+            if (this.roleSearchController) {
+                this.roleSearchController.abort();
+            }
+            this.roleSearchController = new AbortController();
+            
             const query = this.roleSearch.trim();
             
             try {
@@ -122,7 +139,8 @@ function crewForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query }),
+                    signal: this.roleSearchController.signal
                 });
                 
                 if (!response.ok) {
@@ -132,13 +150,22 @@ function crewForm() {
                 const data = await response.json();
                 this.roles = data.roles || [];
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
                 console.error('Role search error:', error);
                 this.roles = [];
+            } finally {
+                this.roleSearchController = null;
             }
         },
         
         async searchTags() {
-            // Remove the length check - search immediately with any input
+            if (this.tagSearchController) {
+                this.tagSearchController.abort();
+            }
+            this.tagSearchController = new AbortController();
+            
             const query = this.tagSearch.trim();
             
             try {
@@ -147,7 +174,8 @@ function crewForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query, current_tag_id: this.formData.tag_id || null })
+                    body: JSON.stringify({ query: query, current_tag_id: this.formData.tag_id || null }),
+                    signal: this.tagSearchController.signal
                 });
                 
                 if (!response.ok) {
@@ -157,8 +185,13 @@ function crewForm() {
                 const data = await response.json();
                 this.tags = data.tags || [];
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
                 console.error('Tag search error:', error);
                 this.tags = [];
+            } finally {
+                this.tagSearchController = null;
             }
         }
     }

@@ -86,6 +86,8 @@ function logForm() {
         crewMembers: [],
         shipyards: [],
         hasValidTimestamps: true,
+        crewSearchController: null,
+        shipyardSearchController: null,
         
         get isFormValid() {
             return this.formData.crew_member_id && 
@@ -98,7 +100,11 @@ function logForm() {
         },
         
         async searchCrewMembers() {
-            // Remove the length check - search immediately with any input
+            if (this.crewSearchController) {
+                this.crewSearchController.abort();
+            }
+            this.crewSearchController = new AbortController();
+            
             const query = this.crewSearch.trim();
             
             try {
@@ -107,7 +113,8 @@ function logForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query }),
+                    signal: this.crewSearchController.signal
                 });
                 
                 if (!response.ok) {
@@ -117,13 +124,22 @@ function logForm() {
                 const data = await response.json();
                 this.crewMembers = data.crew_members || [];
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
                 console.error('Crew search error:', error);
                 this.crewMembers = [];
+            } finally {
+                this.crewSearchController = null;
             }
         },
         
         async searchShipyards() {
-            // Remove the length check - search immediately with any input
+            if (this.shipyardSearchController) {
+                this.shipyardSearchController.abort();
+            }
+            this.shipyardSearchController = new AbortController();
+            
             const query = this.shipyardSearch.trim();
             
             try {
@@ -132,7 +148,8 @@ function logForm() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query }),
+                    signal: this.shipyardSearchController.signal
                 });
                 
                 if (!response.ok) {
@@ -142,8 +159,13 @@ function logForm() {
                 const data = await response.json();
                 this.shipyards = data.shipyards || [];
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
                 console.error('Shipyard search error:', error);
                 this.shipyards = [];
+            } finally {
+                this.shipyardSearchController = null;
             }
         }
     }

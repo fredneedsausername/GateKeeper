@@ -53,9 +53,14 @@ function tagEditForm(existingData) {
         crewSearch: existingData.crew_member_name || '',
         crewMembers: existingData.crew_member_name ? [{id: existingData.crew_member_id, name: existingData.crew_member_name}] : [],
         showSuggestions: false,
+        crewSearchController: null,
         
         async searchCrewMembers() {
-            // Remove the length check - search immediately with any input
+            if (this.crewSearchController) {
+                this.crewSearchController.abort();
+            }
+            this.crewSearchController = new AbortController();
+            
             const query = this.crewSearch.trim();
             
             try {
@@ -64,7 +69,8 @@ function tagEditForm(existingData) {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query }),
+                    signal: this.crewSearchController.signal
                 });
                 
                 if (!response.ok) {
@@ -74,8 +80,13 @@ function tagEditForm(existingData) {
                 const data = await response.json();
                 this.crewMembers = data.crew_members || [];
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
                 console.error('Crew search error:', error);
                 this.crewMembers = [];
+            } finally {
+                this.crewSearchController = null;
             }
         }
     }
