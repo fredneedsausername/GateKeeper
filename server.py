@@ -847,7 +847,7 @@ def add_tag(curs):
                 flash('Nome tag è obbligatorio', 'error')
                 return redirect(request.url)
             # Insert tag
-            curs.execute("INSERT INTO tag (name, remaining_battery, packet_counter) VALUES (%s, %s, %s)", [name, 100.0, 0])
+            curs.execute("INSERT INTO tag (mac_address, remaining_battery, packet_counter) VALUES (%s, %s, %s)", [name, 100.0, 0])
             # Get the new tag ID
             curs.execute("SELECT id FROM tag WHERE name = %s ORDER BY id DESC LIMIT 1", [name])
             tag_id = curs.fetchone()['id']
@@ -875,7 +875,7 @@ def edit_tag(curs, tag_id):
                 return redirect(request.url)
             
             # Update tag name
-            curs.execute("UPDATE tag SET name = %s WHERE id = %s", [name, tag_id])
+            curs.execute("UPDATE tag SET mac_address = %s WHERE id = %s", [name, tag_id])
             # Remove tag from current crew member
             curs.execute("UPDATE crew_member SET tag_id = NULL WHERE tag_id = %s", [tag_id])
             # Assign to new crew member if selected
@@ -1110,7 +1110,7 @@ def search_tags(curs):
     subquery = "SELECT tag_id FROM crew_member WHERE tag_id IS NOT NULL"
     if current_tag_id:
         sql = (
-            "SELECT t.id, t.name "
+            "SELECT t.id, t.mac_address as name "
             "FROM tag t "
             "WHERE LOWER(t.name) LIKE LOWER(%s) "
             "  AND (t.id = %s OR t.id NOT IN (" + subquery + ")) "
@@ -1344,7 +1344,6 @@ BATTERY_MAX_MILLIVOLTS = 3000
 
 @connected_to_database
 def process_device(curs, device):
-
     device_data = device.get("data")
     if not device_data:
         return # Invalid gateway message
@@ -1364,217 +1363,153 @@ def process_device(curs, device):
         return
 
     beacon_mac_address = device_data[8:20]
-
     packet_counter = int(device_data[6:8], 16)
 
     # Compute remaining battery percentage
     eddy_volt = int(device_data[24:28], 16) 
     remaining_battery_percentage = round(eddy_volt / BATTERY_MAX_MILLIVOLTS, 1)
 
-    # Get packet counter for current beacon
-    # We also get the previous_echobeacon for future use, and we put it all in this query for efficiency in this critical server endpoint
-    curs.execute("""
-        SELECT id, packet_counter, previous_echobeacon
-        FROM tag
-        WHERE mac_address = %s
-    """, (beacon_mac_address,))
-
-    fetched = curs.fetchone()
-
-    # Register unknown tag when system comes in contact with it
-    if not fetched:
-
-        curs.execute("""
-            INSERT INTO tag (mac_address, remaining_battery, packet_counter)
-            VALUES (%s, %s, %s)
-        """, (beacon_mac_address, remaining_battery_percentage, packet_counter))
-
-        # If this is the first time that the device passed through the system, then no direction can be inferred. Thus,
-        # it makes no sense to process it any further
-        return
-
-    # Can be None. If it is, no problem at all. Simply means that there is no exclusion based on packet counter number to be made
-    fetched_packet_counter = fetched.get("packet_counter")
-    
-    # Can be None. Later we'll ensure that if it is, then we ignore the message
-    previous_echobeacon = fetched.get("previous_echobeacon")
-
-    # For future use
-    beacon_id = fetched.get("id")
-
-    # If the message is repeated, then skip the read
-    if packet_counter == fetched_packet_counter:
-        return
-
     echobeacon_id = int(device_data[0:4], 16)
 
-    # Update packet counter and last activator beacon
-    # We already cached the true value of the previous activator beacon into the variable "previous_echobeacon"
+    # ATOMIC OPERATION: Register/update tag and get previous state
+    # This handles both new tag registration and existing tag updates atomically
     curs.execute("""
-        UPDATE tag
-        SET
-            packet_counter = %s,
-            previous_echobeacon = (
-                SELECT id
-                FROM activator_beacon
-                WHERE friendly_number = %s
-            ),
-            remaining_battery = %s
-        WHERE mac_address = %s;
-    """, (packet_counter, echobeacon_id, remaining_battery_percentage, beacon_mac_address))
+        INSERT INTO tag (mac_address, remaining_battery, packet_counter, previous_echobeacon)
+        VALUES (%s, %s, %s, (
+            SELECT id FROM activator_beacon WHERE friendly_number = %s
+        ))
+        ON CONFLICT (mac_address) 
+        DO UPDATE SET 
+            remaining_battery = EXCLUDED.remaining_battery,
+            packet_counter = CASE 
+                WHEN EXCLUDED.packet_counter != tag.packet_counter 
+                THEN EXCLUDED.packet_counter 
+                ELSE tag.packet_counter 
+            END,
+            previous_echobeacon = CASE 
+                WHEN EXCLUDED.packet_counter != tag.packet_counter 
+                THEN (SELECT id FROM activator_beacon WHERE friendly_number = %s)
+                ELSE tag.previous_echobeacon 
+            END
+        RETURNING id, 
+                  (CASE WHEN xmax = 0 THEN NULL ELSE packet_counter END) as old_packet_counter,
+                  previous_echobeacon
+    """, (beacon_mac_address, remaining_battery_percentage, packet_counter, 
+          echobeacon_id, echobeacon_id))
 
-    # Now we have ensured that the message is original, and that all the preprocessing has taken place
+    result = curs.fetchone()
+    tag_id = result['id']
+    old_packet_counter = result['old_packet_counter']
+    previous_echobeacon_id = result['previous_echobeacon']
 
-    # ----- PROCESS MESSAGE -----
-
-    # We exclude messages that don't have a previous echobeacon, because no direction can be inferred
-    if not previous_echobeacon:
+    # If this is a repeat packet, skip processing
+    if old_packet_counter == packet_counter:
         return
 
-    # We exclude messages where the previous echobeacon and the current one are the same
-    if previous_echobeacon == echobeacon_id:
+    # If this is the first packet from this tag, no direction can be inferred
+    if old_packet_counter is None:
         return
-    
-    # We get info about the activator beacons to use it in the message processing steps
+
+    # We exclude messages that don't have a previous echobeacon
+    if not previous_echobeacon_id:
+        return
+
+    # Get current beacon information
     curs.execute("""
-        SELECT shipyard_id, is_first_when_entering
+        SELECT id, shipyard_id, is_first_when_entering
         FROM activator_beacon
         WHERE friendly_number = %s
     """, (echobeacon_id,))
 
-    fetched = curs.fetchone()
-
-    # If the echobeacon is not registered, skip processing. We assume that all echobeacons are correctly registered,
-    # so if a message comes from an unrecognized echobeacon it's not something that has to do with us.
-    if not fetched: 
+    current_beacon = curs.fetchone()
+    if not current_beacon: 
         return
 
-    current_shipyard_id = fetched.get("shipyard_id")                        # Not null and without defaults
-    current_is_first_when_entering = fetched.get("is_first_when_entering")  # Not null and without defaults
+    current_beacon_id = current_beacon['id']
+    current_shipyard_id = current_beacon['shipyard_id']
+    current_is_first_when_entering = current_beacon['is_first_when_entering']
 
-    # We get the shipyard of the previous echobeacon, to compare it with the current one
-    # We can deduce the direction information without is_first_when_entering
+    # We exclude messages where the previous echobeacon and current one are the same
+    if previous_echobeacon_id == current_beacon_id:
+        return
+    
+    # Get previous beacon information to verify same shipyard
     curs.execute("""
-        SELECT shipyard_id
+        SELECT shipyard_id, is_first_when_entering
         FROM activator_beacon
-        WHERE friendly_number = %s
-    """, (previous_echobeacon,))
+        WHERE id = %s
+    """, (previous_echobeacon_id,))
 
-    fetched = curs.fetchone()
-
-    # If the previous activator beacon got eliminated in the meanwhile, skip processing. That's because
-    # we cannot deduce a direction.
-    if not fetched:
+    previous_beacon = curs.fetchone()
+    if not previous_beacon:
         return
 
-    previous_shipyard_id = fetched.get("shipyard_id")
+    previous_shipyard_id = previous_beacon['shipyard_id']
+    previous_is_first_when_entering = previous_beacon['is_first_when_entering']
 
-    # If the previous echobeacon comes from a different shipyard, it makes no sense to deduce a direction out of it
+    # If beacons are from different shipyards, ignore
     if current_shipyard_id != previous_shipyard_id:
         return
     
-    # Now we are sure that the activator beacons are different and from the same shipyard: we can deduce a direction.
-    is_direction_entering = None
-
-    if current_is_first_when_entering:
+    # Determine direction based on beacon sequence
+    if previous_is_first_when_entering and not current_is_first_when_entering:
+        is_direction_entering = True
+    elif not previous_is_first_when_entering and current_is_first_when_entering:
         is_direction_entering = False
     else:
-        is_direction_entering = True
+        # Invalid sequence, ignore
+        return
 
     # ----- DETERMINE EVENT TYPE (entry or log) -----
 
-    is_entry = None
-
+    # Check if tag is assigned to a crew member
     curs.execute("""
         SELECT id
         FROM crew_member
         WHERE tag_id = %s
-    """, (beacon_id,))
+    """, (tag_id,))
 
-    fetched = curs.fetchone()
+    crew_member = curs.fetchone()
 
-    # If no crew member has ownership of the tag, then it is an unassigned tag entry, else it is a log
-    if not fetched:
-        is_entry = True
-    else:
-        is_entry = False
-        crew_member_id = fetched.get("id")
-    
-    # --- Register event in database ---
-
-    if is_entry:
+    if not crew_member:
+        # Unassigned tag - create entry
         curs.execute("""
             INSERT INTO unassigned_tag_entry (tag_id, shipyard_id, is_entering)
             VALUES (%s, %s, %s)
-        """, (beacon_id, current_shipyard_id, is_direction_entering))
-
-        # Finished processing
+        """, (tag_id, current_shipyard_id, is_direction_entering))
         return
-    
-    else:
 
-        # Check if the most recent log of the crew member, that is from the same shipyard exists, is open, or closed
+    # Tag is assigned - handle permanence log
+    crew_member_id = crew_member['id']
+
+    if is_direction_entering:
+        # Always create new entry log
         curs.execute("""
-            SELECT entry_timestamp, leave_timestamp
-            FROM permanence_log
-            WHERE
-                shipyard_id = %s AND
-                crew_member_id = %s
-            ORDER BY GREATEST(entry_timestamp, leave_timestamp) DESC NULLS LAST
-            LIMIT 1;
-        """, (current_shipyard_id, crew_member_id))
-
-        # To understand whether the log is open or closed we look at the timestamps
-
-        fetched = curs.fetchone()
-
-        exists = bool(fetched)
-
-        if exists:
-            is_closed = bool(fetched.get("leave_timestamp"))
-
-        if is_direction_entering:
+            INSERT INTO permanence_log (crew_member_id, shipyard_id, entry_timestamp)
+            VALUES (%s, %s, NOW())
+        """, (crew_member_id, current_shipyard_id))
+    else:
+        # ATOMIC OPERATION: Close most recent open log for this crew member in this shipyard
+        curs.execute("""
+            UPDATE permanence_log 
+            SET leave_timestamp = NOW()
+            WHERE id = (
+                SELECT id FROM permanence_log 
+                WHERE crew_member_id = %s 
+                  AND shipyard_id = %s 
+                  AND leave_timestamp IS NULL
+                ORDER BY entry_timestamp DESC 
+                LIMIT 1
+            )
+        """, (crew_member_id, current_shipyard_id))
+        
+        # If no open log was found, create exit-only log
+        if curs.rowcount == 0:
             curs.execute("""
-                INSERT INTO permanence_log (
-                    crew_member_id,
-                    shipyard_id,
-                    entry_timestamp
-                ) VALUES (
-                    %s,
-                    %s,
-                    NOW()
-                )
+                INSERT INTO permanence_log (crew_member_id, shipyard_id, leave_timestamp)
+                VALUES (%s, %s, NOW())
             """, (crew_member_id, current_shipyard_id))
-        else:
-            # We infer that it is open, using a short-circuit evalutation
-            if exists and (not is_closed):
-                curs.execute("""
-                    UPDATE permanence_log
-                    SET leave_timestamp = NOW()
-                    WHERE id = (
-                        SELECT id
-                        FROM permanence_log
-                        WHERE
-                            crew_member_id = %s AND
-                            shipyard_id = %s
-                        ORDER BY GREATEST(entry_timestamp, leave_timestamp) DESC NULLS LAST
-                        LIMIT 1;
-                    )
-                """)
-            else:
-                curs.execute("""
-                    INSERT INTO permanence_log (
-                        crew_member_id,
-                        shipyard_id,
-                        leave_timestamp
-                    ) VALUES (
-                        %s,
-                        %s,
-                        NOW()
-                    )
-                """, (crew_member_id, current_shipyard_id))
-
-        return
+            
 
 @app.route('/gateway-endpoint', methods=['POST'])
 def gateway_endpoint():
@@ -1592,10 +1527,6 @@ def gateway_endpoint():
     device_list = value.get("device_list")
     if not device_list:
         return "Invalid gateway message", 400
-    
-    # From here on out the order of the lines of code is quirky
-    # This is intentional: things appear in the order that makes for the fastest execution
-    # That can only be done if we study the order of the instructions to make the ones that command the exit conditions first
 
     for device in device_list:
         process_device(device)
