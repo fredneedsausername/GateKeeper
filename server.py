@@ -1455,36 +1455,56 @@ def process_device(curs, device):
 
     echobeacon_id = int(device_data[0:4], 16)
 
-    # ATOMIC OPERATION: Register/update tag and get previous state
-    # This handles both new tag registration and existing tag updates atomically
+    # Method 1: Explicit SELECT then INSERT/UPDATE pattern
+    # First, check if tag already exists
     curs.execute("""
-        INSERT INTO tag (mac_address, remaining_battery, packet_counter, previous_echobeacon)
-        VALUES (%s, %s, %s, (
-            SELECT id FROM activator_beacon WHERE friendly_number = %s
-        ))
-        ON CONFLICT (mac_address) 
-        DO UPDATE SET 
-            remaining_battery = EXCLUDED.remaining_battery,
-            packet_counter = CASE 
-                WHEN EXCLUDED.packet_counter != tag.packet_counter 
-                THEN EXCLUDED.packet_counter 
-                ELSE tag.packet_counter 
-            END,
-            previous_echobeacon = CASE 
-                WHEN EXCLUDED.packet_counter != tag.packet_counter 
-                THEN (SELECT id FROM activator_beacon WHERE friendly_number = %s)
-                ELSE tag.previous_echobeacon 
-            END
-        RETURNING id, 
-                  (CASE WHEN xmax = 0 THEN NULL ELSE packet_counter END) as old_packet_counter,
-                  previous_echobeacon
-    """, (beacon_mac_address, remaining_battery_percentage, packet_counter, 
-          echobeacon_id, echobeacon_id))
+        SELECT id, packet_counter, previous_echobeacon 
+        FROM tag 
+        WHERE mac_address = %s
+    """, (beacon_mac_address,))
 
-    result = curs.fetchone()
-    tag_id = result['id']
-    old_packet_counter = result['old_packet_counter']
-    previous_echobeacon_id = result['previous_echobeacon']
+    existing_tag = curs.fetchone()
+    
+    if existing_tag:
+        # Tag exists - update it
+        tag_id = existing_tag['id']
+        old_packet_counter = existing_tag['packet_counter']
+        
+        # Update tag with new values, applying same logic as original ON CONFLICT
+        curs.execute("""
+            UPDATE tag 
+            SET remaining_battery = %s,
+                packet_counter = CASE 
+                    WHEN %s != packet_counter THEN %s 
+                    ELSE packet_counter 
+                END,
+                previous_echobeacon = CASE 
+                    WHEN %s != packet_counter 
+                    THEN (SELECT id FROM activator_beacon WHERE friendly_number = %s)
+                    ELSE previous_echobeacon 
+                END
+            WHERE id = %s
+            RETURNING previous_echobeacon
+        """, (remaining_battery_percentage, packet_counter, packet_counter, 
+              packet_counter, echobeacon_id, tag_id))
+        
+        result = curs.fetchone()
+        previous_echobeacon_id = result['previous_echobeacon'] if result else existing_tag['previous_echobeacon']
+        
+    else:
+        # Tag doesn't exist - insert new tag
+        curs.execute("""
+            INSERT INTO tag (mac_address, remaining_battery, packet_counter, previous_echobeacon)
+            VALUES (%s, %s, %s, (
+                SELECT id FROM activator_beacon WHERE friendly_number = %s
+            ))
+            RETURNING id, previous_echobeacon
+        """, (beacon_mac_address, remaining_battery_percentage, packet_counter, echobeacon_id))
+        
+        result = curs.fetchone()
+        tag_id = result['id']
+        previous_echobeacon_id = result['previous_echobeacon']
+        old_packet_counter = None  # This was a new insert
 
     # If this is a repeat packet, skip processing
     if old_packet_counter == packet_counter:
