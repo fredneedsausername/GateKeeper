@@ -701,7 +701,7 @@ def edit_crew(curs, crew_id):
             return redirect(request.url)
     # GET request
     curs.execute(
-        """SELECT cm.*, s.name as ship_name, cr.role_name, t.name as tag_name
+        """SELECT cm.*, s.name as ship_name, cr.role_name, t.mac_address as tag_name
            FROM crew_member cm
            LEFT JOIN ship s ON cm.ship_id = s.id
            LEFT JOIN crew_member_roles cr ON cm.role_id = cr.id
@@ -849,7 +849,7 @@ def add_tag(curs):
             # Insert tag
             curs.execute("INSERT INTO tag (mac_address, remaining_battery, packet_counter) VALUES (%s, %s, %s)", [name, 100.0, 0])
             # Get the new tag ID
-            curs.execute("SELECT id FROM tag WHERE name = %s ORDER BY id DESC LIMIT 1", [name])
+            curs.execute("SELECT id FROM tag WHERE mac_address = %s ORDER BY id DESC LIMIT 1", [name])
             tag_id = curs.fetchone()['id']
             # If crew member selected, assign tag to them
             if crew_member_id:
@@ -1112,18 +1112,18 @@ def search_tags(curs):
         sql = (
             "SELECT t.id, t.mac_address as name "
             "FROM tag t "
-            "WHERE LOWER(t.name) LIKE LOWER(%s) "
+            "WHERE LOWER(t.mac_address) LIKE LOWER(%s) "
             "  AND (t.id = %s OR t.id NOT IN (" + subquery + ")) "
-            "ORDER BY t.name LIMIT 10"
+            "ORDER BY t.mac_address LIMIT 10"
         )
         params.append(current_tag_id)
     else:
         sql = (
-            "SELECT t.id, t.name "
+            "SELECT t.id, t.mac_address as name "
             "FROM tag t "
-            "WHERE LOWER(t.name) LIKE LOWER(%s) "
+            "WHERE LOWER(t.mac_address) LIKE LOWER(%s) "
             "  AND t.id NOT IN (" + subquery + ") "
-            "ORDER BY t.name LIMIT 10"
+            "ORDER BY t.mac_address LIMIT 10"
         )
     curs.execute(sql, params)
     tags = curs.fetchall()
