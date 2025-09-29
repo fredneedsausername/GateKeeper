@@ -506,7 +506,7 @@ def create_table_config(table_type, filters, page, request_path):
     elif table_type == "tag":
         return {
             "title": "Gestione Tag",
-            "description": "Visualizza e gestisci i tag",
+            "description": "Visualizza i tag",
             "columns": [
                 {"key": "name", "label": "Tag", "type": "text"},
                 {"key": "remaining_battery", "label": "🔋%", "type": "battery"},
@@ -519,9 +519,9 @@ def create_table_config(table_type, filters, page, request_path):
                 {"key": "assigned", "label": "Assegnati"},
                 {"key": "vacant", "label": "Vacanti"}
             ],
-            "allow_add": True,
-            "allow_edit": True,
-            "allow_delete": True,
+            "allow_add": False,
+            "allow_edit": False,
+            "allow_delete": False,
             "add_button_text": "Aggiungi Tag",
             "empty_message": "Seleziona almeno un filtro per visualizzare i tag.",
             "add_url": "/tag/add",
@@ -901,90 +901,6 @@ def tags_page():
     
     # Return full page for regular requests
     return render_template('tags.html', table_config=table_config)
-
-@app.route('/tag/add', methods=['GET', 'POST'])
-@auth_required
-@connected_to_database
-def add_tag(curs):
-    if request.method == 'POST':
-        try:
-            name = request.form.get('name')
-            crew_member_id = request.form.get('crew_member_id') or None
-            
-            if not name:
-                flash('Nome tag è obbligatorio', 'error')
-                return redirect(request.url)
-            # Insert tag
-            curs.execute("INSERT INTO tag (mac_address, remaining_battery, packet_counter) VALUES (%s, %s, %s)", [name, 100.0, 0])
-            # Get the new tag ID
-            curs.execute("SELECT id FROM tag WHERE mac_address = %s ORDER BY id DESC LIMIT 1", [name])
-            tag_id = curs.fetchone()['id']
-            # If crew member selected, assign tag to them
-            if crew_member_id:
-                curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", [tag_id, crew_member_id])
-            flash('Tag aggiunto con successo', 'success')
-            return redirect('/tag')
-        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
-            flash(f'Errore database: {str(e)}', 'error')
-            return redirect(request.url)
-        except Exception as e:
-            flash(f'Errore durante l\'aggiunta: {str(e)}', 'error')
-            return redirect(request.url)
-    return render_template('tag_add.html')
-
-@app.route('/tag/edit/<int:tag_id>', methods=['GET', 'POST'])
-@auth_required
-@connected_to_database
-def edit_tag(curs, tag_id):
-    if request.method == 'POST':
-        try:
-            name = request.form.get('name')
-            crew_member_id = request.form.get('crew_member_id') or None
-            
-            if not name:
-                flash('Nome tag è obbligatorio', 'error')
-                return redirect(request.url)
-            
-            # Update tag name
-            curs.execute("UPDATE tag SET mac_address = %s WHERE id = %s", [name, tag_id])
-            # Remove tag from current crew member
-            curs.execute("UPDATE crew_member SET tag_id = NULL WHERE tag_id = %s", [tag_id])
-            # Assign to new crew member if selected
-            if crew_member_id:
-                curs.execute("UPDATE crew_member SET tag_id = %s WHERE id = %s", [tag_id, crew_member_id])
-            flash('Tag aggiornato con successo', 'success')
-            return redirect('/tag')
-        except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
-            flash(f'Errore database: {str(e)}', 'error')
-            return redirect(request.url)
-        except Exception as e:
-            flash(f'Errore durante l\'aggiornamento: {str(e)}', 'error')
-            return redirect(request.url)
-    # GET request
-    curs.execute(
-        """SELECT t.*, cm.name as crew_member_name, cm.id as crew_member_id
-           FROM tag t
-           LEFT JOIN crew_member cm ON t.id = cm.tag_id
-           WHERE t.id = %s""",
-        [tag_id]
-    )
-    tag = curs.fetchone()
-    if not tag:
-        flash('Tag non trovato', 'error')
-        return redirect('/tag')
-    return render_template('tag_edit.html', tag=tag)
-
-@app.route('/api/tags/delete/<int:tag_id>', methods=['DELETE'])
-@auth_required
-@connected_to_database
-def delete_tag(curs, tag_id):
-    try:
-        curs.execute("DELETE FROM tag WHERE id = %s", [tag_id])
-        return jsonify({"success": True, "message": "Tag eliminato con successo"})
-    except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
-        return jsonify({"success": False, "error": f"Errore database: {str(e)}"}), 500
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
 
 # ===== ENTRIES ROUTES WITH HTMX =====
 
