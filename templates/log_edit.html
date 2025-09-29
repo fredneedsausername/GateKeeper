@@ -5,7 +5,21 @@
     <h2 class="base-content-title">Modifica Log</h2>
     <p class="base-content-description">Modifica i dati del log di permanenza</p>
     
-    <form method="POST" x-data='logEditForm({{ log|tojson }})'>
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="base-flash-messages" style="margin-bottom: 24px;">
+                {% for category, message in messages %}
+                <div class="base-flash-message {{ category }}" x-data="{ show: true }" x-show="show" x-cloak>
+                    <span>{{ message }}</span>
+                    <button @click="show = false" class="base-flash-close" aria-label="Chiudi">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+    
+    <form method="POST" x-data='logEditForm({{ log|tojson }})' x-cloak>
         <div class="base-form-group">
             <label>Cantiere</label>
             <input type="text" value="{{ log.shipyard_name|e }}" disabled style="background-color: #f3f4f6; cursor: not-allowed;">
@@ -80,8 +94,13 @@ function logEditForm(existingData) {
         },
         crewSearch: existingData.crew_member_name || '',
         crewMembers: existingData.crew_member_name ? [{id: existingData.crew_member_id, name: existingData.crew_member_name}] : [],
-        hasValidTimestamps: true,
+        hasValidTimestamps: true,  // Initialize as true since we're editing existing data
         crewSearchController: null,
+        
+        init() {
+            // Validate on initialization to set correct state
+            this.validateTimestamps();
+        },
         
         get isFormValid() {
             return this.formData.crew_member_id && 

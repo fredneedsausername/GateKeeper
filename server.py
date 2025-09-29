@@ -84,6 +84,28 @@ app.secret_key = str(secret_key)
 
 # ===== UTILITY FUNCTIONS =====
 
+def validate_timestamp(timestamp_str, field_name):
+    """
+    Validate that a timestamp string represents a date between year 1000 and 3000.
+    Returns (is_valid, error_message)
+    """
+    if not timestamp_str:
+        return True, None  # Empty timestamps are allowed (at least one must be provided, checked elsewhere)
+    
+    try:
+        dt = datetime.fromisoformat(timestamp_str.replace('T', ' '))
+        
+        if dt.year < 1000:
+            return False, f"{field_name} deve essere dopo l'anno 1000"
+        
+        if dt.year > 3000:
+            return False, f"{field_name} deve essere prima dell'anno 3000"
+        
+        return True, None
+        
+    except (ValueError, AttributeError):
+        return False, f"{field_name} non è un formato valido"
+
 @connected_to_database
 def get_ships_for_dropdown(curs):
     curs.execute("SELECT id, name FROM ship ORDER BY name")
@@ -1053,12 +1075,27 @@ def add_log(curs):
             shipyard_id = request.form.get('shipyard_id')
             entry_timestamp = request.form.get('entry_timestamp') or None
             leave_timestamp = request.form.get('leave_timestamp') or None
+            
             if not crew_member_id or not shipyard_id:
                 flash('Crew member e cantiere sono obbligatori', 'error')
                 return redirect(request.url)
+            
             if not entry_timestamp and not leave_timestamp:
                 flash('Almeno una data (entrata o uscita) è obbligatoria', 'error')
                 return redirect(request.url)
+            
+            # Validate entry timestamp
+            is_valid, error_msg = validate_timestamp(entry_timestamp, "Data entrata")
+            if not is_valid:
+                flash(error_msg, 'error')
+                return redirect(request.url)
+            
+            # Validate leave timestamp
+            is_valid, error_msg = validate_timestamp(leave_timestamp, "Data uscita")
+            if not is_valid:
+                flash(error_msg, 'error')
+                return redirect(request.url)
+            
             curs.execute(
                 "INSERT INTO permanence_log (crew_member_id, shipyard_id, entry_timestamp, leave_timestamp) VALUES (%s, %s, %s, %s)",
                 [crew_member_id, shipyard_id, entry_timestamp, leave_timestamp]
@@ -1082,12 +1119,27 @@ def edit_log(curs, log_id):
             crew_member_id = request.form.get('crew_member_id')
             entry_timestamp = request.form.get('entry_timestamp') or None
             leave_timestamp = request.form.get('leave_timestamp') or None
+            
             if not crew_member_id:
                 flash('Crew member è obbligatorio', 'error')
                 return redirect(request.url)
+            
             if not entry_timestamp and not leave_timestamp:
                 flash('Almeno una data (entrata o uscita) è obbligatoria', 'error')
                 return redirect(request.url)
+            
+            # Validate entry timestamp
+            is_valid, error_msg = validate_timestamp(entry_timestamp, "Data entrata")
+            if not is_valid:
+                flash(error_msg, 'error')
+                return redirect(request.url)
+            
+            # Validate leave timestamp
+            is_valid, error_msg = validate_timestamp(leave_timestamp, "Data uscita")
+            if not is_valid:
+                flash(error_msg, 'error')
+                return redirect(request.url)
+            
             curs.execute(
                 "UPDATE permanence_log SET crew_member_id = %s, entry_timestamp = %s, leave_timestamp = %s WHERE id = %s",
                 [crew_member_id, entry_timestamp, leave_timestamp, log_id]
@@ -1328,103 +1380,6 @@ def filter_shipyards(curs):
     
     options = [{"value": shipyard["id"], "label": shipyard["name"]} for shipyard in shipyards]
     return jsonify({"options": options})
-
-# import json
-# @app.route('/gateway-endpoint', methods=['POST'])
-# def gateway_endpoint():
-#     # Dump to log
-#     script_dir = os.path.dirname(os.path.abspath(__file__))
-#     log_file_path = os.path.join(script_dir, 'beacon_dump.txt')
-    
-#     try:
-#         with open(log_file_path, 'a', encoding='utf-8') as f:
-#             json_data = request.json
-            
-#             if json_data:
-#                 f.write("JSON received:\n")
-#                 f.write(json.dumps(json_data, indent=4))
-#                 f.write("\n\n")
-#             else:
-#                 processed_data = request.get_data().decode('utf-8')
-#                 f.write(processed_data)
-#                 f.write("\n\n")
-        
-#         return "Data logged successfully", 200
-            
-#     except Exception as e:
-#         # Fallback to console if file writing fails
-#         print(f"Error writing to log file: {e}")
-#         json_data = request.json
-#         if json_data:
-#             print("JSON received:")
-#             print(json.dumps(json_data, indent=2))
-#         else:
-#             processed_data = request.get_data().decode('utf-8')
-#             print(processed_data)
-        
-#         return "Error logging data", 500
-
-
-
-
-# script_dir = os.path.dirname(os.path.abspath(__file__))
-# log_file_path = os.path.join(script_dir, 'beacon_dump.txt')
-# import threading
-# log_lock = threading.Lock()
-# beacon_dump_writer = open(log_file_path, 'a', encoding='utf-8')
-
-# with log_lock:
-#         beacon_dump_writer.write("mac         |echo |rssi (dbm)|count\n")
-#         beacon_dump_writer.write("------------+-----+----------+-----\n")
-#         beacon_dump_writer.flush()
-
-# def print_formatted_data(mac, echo, rssi, count):
-#     with log_lock:
-#         beacon_dump_writer.write(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}\n")
-#         beacon_dump_writer.flush()
-
-# @app.route('/gateway-endpoint', methods=['POST'])
-# def gateway_endpoint():
-#     json_data = request.json
-
-#     data = json_data.get("data")
-#     if not data:
-#         return "Invalid gateway message", 400
-
-#     value = data.get("value")
-#     if not value:
-#         return "Invalid gateway message", 400
-    
-#     device_list = value.get("device_list")
-#     if not device_list:
-#         return "Invalid gateway message", 400
-    
-#     for device in device_list:
-        
-#         device_data = device.get("data")
-#         if not device_data:
-#             return "Invalid gateway message", 400
-        
-#         device_data = device_data[16:] # Skip header
-
-#         unprocessed_echobeacon_id = device_data[:4]
-#         packet_type = device_data[4:6]
-#         packet_counter = device_data[6:8]
-#         mac_address = device_data[8:20]
-#         unprocessed_rssi = device_data[20:22]
-
-#         # Only consider echo packets
-#         if packet_type != "03":
-#             continue
-
-#         echobeacon_id = str(int(unprocessed_echobeacon_id, 16))
-#         rssi_dbm = str(int(unprocessed_rssi, 16) - 256)
-
-#         print_formatted_data(mac_address, echobeacon_id, rssi_dbm, packet_counter)
-    
-#     return "Processed correctly", 200
-
-
 
 
 # Used to determine remaining battery percentage

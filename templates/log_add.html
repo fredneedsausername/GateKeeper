@@ -5,7 +5,21 @@
     <h2 class="base-content-title">Aggiungi Log</h2>
     <p class="base-content-description">Inserisci i dati del nuovo log di permanenza</p>
     
-    <form method="POST" x-data="logForm()">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="base-flash-messages" style="margin-bottom: 24px;">
+                {% for category, message in messages %}
+                <div class="base-flash-message {{ category }}" x-data="{ show: true }" x-show="show" x-cloak>
+                    <span>{{ message }}</span>
+                    <button @click="show = false" class="base-flash-close" aria-label="Chiudi">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+    
+    <form method="POST" x-data="logForm()" x-cloak>
         <div class="base-form-group">
             <label for="crew_member">Equipaggio *</label>
             <input type="text" 
@@ -13,7 +27,7 @@
                    @focus="searchCrewMembers()"
                    @input.debounce.500ms="searchCrewMembers()"
                    placeholder="Cerca membro equipaggio...">
-            <select x-cloak x-model="formData.crew_member_id" x-show="crewMembers.length > 0 || crewSearch" name="crew_member_id" required>
+            <select x-model="formData.crew_member_id" x-show="crewMembers.length > 0 || crewSearch" name="crew_member_id" required>
                 <option value="">Nessun membro equipaggio</option>
                 <option disabled x-show="crewMembers.length === 0">Nessun risultato trovato</option>
                 <template x-for="member in crewMembers" :key="member.id">
@@ -28,7 +42,7 @@
                    x-model="shipyardSearch" 
                    @input.debounce.500ms="searchShipyards()"
                    placeholder="Cerca cantiere...">
-            <select x-cloak x-model="formData.shipyard_id" x-show="shipyards.length > 0 || shipyardSearch" name="shipyard_id" required>
+            <select x-model="formData.shipyard_id" x-show="shipyards.length > 0 || shipyardSearch" name="shipyard_id" required>
                 <option value="">Nessun cantiere</option>
                 <option disabled x-show="shipyards.length === 0">Nessun risultato trovato</option>
                 <template x-for="shipyard in shipyards" :key="shipyard.id">
@@ -85,7 +99,7 @@ function logForm() {
         shipyardSearch: '',
         crewMembers: [],
         shipyards: [],
-        hasValidTimestamps: true,
+        hasValidTimestamps: true,  // Start as true, only show error after user interaction
         crewSearchController: null,
         shipyardSearchController: null,
         
