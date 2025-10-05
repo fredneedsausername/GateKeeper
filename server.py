@@ -1371,19 +1371,8 @@ def process_device(curs, device):
         previous_echobeacon_id = result['previous_echobeacon'] if result else existing_tag['previous_echobeacon']
         
     else:
-        # Tag doesn't exist - insert new tag
-        curs.execute("""
-            INSERT INTO tag (mac_address, remaining_battery, packet_counter, previous_echobeacon)
-            VALUES (%s, %s, %s, (
-                SELECT id FROM activator_beacon WHERE friendly_number = %s
-            ))
-            RETURNING id, previous_echobeacon
-        """, (beacon_mac_address, remaining_battery_percentage, packet_counter, echobeacon_id))
-        
-        result = curs.fetchone()
-        tag_id = result['id']
-        previous_echobeacon_id = result['previous_echobeacon']
-        old_packet_counter = None  # This was a new insert
+        # Tag isn't registered - return early
+        return
 
     # If this is a repeat packet, skip processing
     if old_packet_counter == packet_counter:
