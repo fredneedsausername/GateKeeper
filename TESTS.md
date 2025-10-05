@@ -6,7 +6,7 @@
 [ ] Check that if the past beacon is the same as the current one, then the advertisement is ignored.
 [ ] Check that if either the past or the current beacon don't exist in the table, then the advertisement is ignored.
 [ ] Check that if the adverisement has past activator id equal to 0 then the advertisement is ignored.
-[ ] Check that if the tag name of the advertisement is not found in the table then a new tag row is created in the db, taking the information from the advertisement.
+[ ] Check that if the tag name of the advertisement is not found in the table then the advertisement is ignored.
 [ ] Check that every single advertisement from a tag updates its battery level, even if the advertisement is not valid.
 [ ] Check that if the tag of the advertisement hasn't their packet counter already set in the table, then it is set to the one of the advertisement.
 [ ] Check that if the packet counter of the advertisement is the same as the value of the tag record, then the advertisement is ignored.
