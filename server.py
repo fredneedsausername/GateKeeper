@@ -1303,185 +1303,159 @@ BATTERY_MAX_MILLIVOLTS = 3000
 
 @connected_to_database
 def process_device(curs, device):
+    # Parse raw payload
     device_data = device.get("data")
     if not device_data:
-        return # Invalid gateway message
-
-    device_data = device_data[16:] # Skip header
-
-    # Validate data length
+        return
+    device_data = device_data[16:]  # skip gateway header
     if len(device_data) < 28:
-        return  # Invalid data length
-
-    # Here device_data is a payload like 0001030F0C2A6F8A9289D1000000000000000000000000
-
-    # Consider only presence packets
-    message_type = device_data[4:6]
-    if message_type != "03":
         return
-    
-    # Consider only Eddystone TLM packets
-    packet_payload = int(device_data[22:24], 16)
-    if not (packet_payload & 0x04):
+    if device_data[4:6] != "03":  # presence packets only
+        return
+    if not (int(device_data[22:24], 16) & 0x04):  # require Eddystone TLM flag
         return
 
+    # Decode fields
     beacon_mac_address = device_data[8:20]
     packet_counter = int(device_data[6:8], 16)
-
-    # Compute remaining battery percentage
-    eddy_volt = int(device_data[24:28], 16) 
+    eddy_volt = int(device_data[24:28], 16)
     remaining_battery_percentage = round((eddy_volt / BATTERY_MAX_MILLIVOLTS) * 100, 1)
+    echobeacon_friendly = int(device_data[0:4], 16)
 
-    echobeacon_id = int(device_data[0:4], 16)
-
-    # Method 1: Explicit SELECT then INSERT/UPDATE pattern
-    # First, check if tag already exists
+    # Resolve tag
     curs.execute("""
-        SELECT id, packet_counter, previous_echobeacon 
-        FROM tag 
+        SELECT id, packet_counter, previous_echobeacon
+        FROM tag
         WHERE mac_address = %s
     """, (beacon_mac_address,))
-
-    existing_tag = curs.fetchone()
-    
-    if existing_tag:
-        # Tag exists - update it
-        tag_id = existing_tag['id']
-        old_packet_counter = existing_tag['packet_counter']
-        
-        # Update tag with new values, applying same logic as original ON CONFLICT
-        curs.execute("""
-            UPDATE tag 
-            SET remaining_battery = %s,
-                packet_counter = CASE 
-                    WHEN %s != packet_counter THEN %s 
-                    ELSE packet_counter 
-                END,
-                previous_echobeacon = CASE 
-                    WHEN %s != packet_counter 
-                    THEN (SELECT id FROM activator_beacon WHERE friendly_number = %s)
-                    ELSE previous_echobeacon 
-                END
-            WHERE id = %s
-            RETURNING previous_echobeacon
-        """, (remaining_battery_percentage, packet_counter, packet_counter, 
-              packet_counter, echobeacon_id, tag_id))
-        
-        result = curs.fetchone()
-        previous_echobeacon_id = result['previous_echobeacon'] if result else existing_tag['previous_echobeacon']
-        
-    else:
-        # Tag isn't registered - return early
+    tag = curs.fetchone()
+    if not tag:
         return
 
-    # If this is a repeat packet, skip processing
+    tag_id = tag['id']
+    old_packet_counter = tag['packet_counter']
+    prev_echobeacon_before = tag['previous_echobeacon']
+
+    # Update telemetry; set previous_echobeacon to current beacon only when packet changes
+    curs.execute("""
+        UPDATE tag
+        SET remaining_battery = %s,
+            packet_counter = CASE
+                WHEN packet_counter IS NULL OR %s <> packet_counter THEN %s
+                ELSE packet_counter
+            END,
+            previous_echobeacon = CASE
+                WHEN packet_counter IS NULL OR %s <> packet_counter
+                    THEN (SELECT id FROM activator_beacon WHERE friendly_number = %s)
+                ELSE previous_echobeacon
+            END
+        WHERE id = %s
+    """, (
+        remaining_battery_percentage,
+        packet_counter, packet_counter,
+        packet_counter, echobeacon_friendly,
+        tag_id
+    ))
+
+    # Ignore duplicates and first-ever packets (need a pair)
     if old_packet_counter == packet_counter:
         return
-
-    # If this is the first packet from this tag, no direction can be inferred
     if old_packet_counter is None:
         return
 
-    # We exclude messages that don't have a previous echobeacon
+    # Need a prior beacon to compute direction
+    previous_echobeacon_id = prev_echobeacon_before
     if not previous_echobeacon_id:
         return
 
-    # Get current beacon information
+    # Current beacon (by friendly number)
     curs.execute("""
         SELECT id, shipyard_id, is_first_when_entering
         FROM activator_beacon
         WHERE friendly_number = %s
-    """, (echobeacon_id,))
-
+    """, (echobeacon_friendly,))
     current_beacon = curs.fetchone()
-    if not current_beacon: 
+    if not current_beacon:
         return
-
     current_beacon_id = current_beacon['id']
     current_shipyard_id = current_beacon['shipyard_id']
     current_is_first_when_entering = current_beacon['is_first_when_entering']
 
-    # We exclude messages where the previous echobeacon and current one are the same
+    # No movement across same beacon
     if previous_echobeacon_id == current_beacon_id:
         return
-    
-    # Get previous beacon information to verify same shipyard
+
+    # Previous beacon (by stored id)
     curs.execute("""
         SELECT shipyard_id, is_first_when_entering
         FROM activator_beacon
         WHERE id = %s
     """, (previous_echobeacon_id,))
-
     previous_beacon = curs.fetchone()
     if not previous_beacon:
         return
-
     previous_shipyard_id = previous_beacon['shipyard_id']
     previous_is_first_when_entering = previous_beacon['is_first_when_entering']
 
-    # If beacons are from different shipyards, ignore
+    # Ignore cross-yard transitions
     if current_shipyard_id != previous_shipyard_id:
         return
-    
-    # Determine direction based on beacon sequence
+
+    # Direction from beacon pair
     if previous_is_first_when_entering and not current_is_first_when_entering:
         is_direction_entering = True
-    elif not previous_is_first_when_entering and current_is_first_when_entering:
+    elif (not previous_is_first_when_entering) and current_is_first_when_entering:
         is_direction_entering = False
     else:
-        # Invalid sequence, ignore
-        return
+        return  # invalid pair (e.g., two firsts or two seconds)
 
-    # ----- DETERMINE EVENT TYPE (entry or log) -----
-
-    # Check if tag is assigned to a crew member
+    # Resolve assigned crew member (if any)
     curs.execute("""
         SELECT id
         FROM crew_member
         WHERE tag_id = %s
     """, (tag_id,))
-
     crew_member = curs.fetchone()
 
     if not crew_member:
-        # Unassigned tag - create entry
+        # Unassigned tag → record and reset pairing (prevents overlapping pairs)
         curs.execute("""
             INSERT INTO unassigned_tag_entry (tag_id, shipyard_id, is_entering)
             VALUES (%s, %s, %s)
         """, (tag_id, current_shipyard_id, is_direction_entering))
+        curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
         return
 
-    # Tag is assigned - handle permanence log
     crew_member_id = crew_member['id']
 
     if is_direction_entering:
-        # Always create new entry log
+        # Open new log, then reset pairing
         curs.execute("""
             INSERT INTO permanence_log (crew_member_id, shipyard_id, entry_timestamp)
             VALUES (%s, %s, NOW())
         """, (crew_member_id, current_shipyard_id))
+        curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
     else:
-        # ATOMIC OPERATION: Close most recent open log for this crew member in this shipyard
+        # Close most recent open log (or create exit-only), then reset pairing
         curs.execute("""
-            UPDATE permanence_log 
+            UPDATE permanence_log
             SET leave_timestamp = NOW()
             WHERE id = (
-                SELECT id FROM permanence_log 
-                WHERE crew_member_id = %s 
-                  AND shipyard_id = %s 
+                SELECT id FROM permanence_log
+                WHERE crew_member_id = %s
+                  AND shipyard_id = %s
                   AND leave_timestamp IS NULL
-                ORDER BY entry_timestamp DESC 
+                ORDER BY entry_timestamp DESC
                 LIMIT 1
             )
         """, (crew_member_id, current_shipyard_id))
-        
-        # If no open log was found, create exit-only log
         if curs.rowcount == 0:
             curs.execute("""
                 INSERT INTO permanence_log (crew_member_id, shipyard_id, leave_timestamp)
                 VALUES (%s, %s, NOW())
             """, (crew_member_id, current_shipyard_id))
-            
+        curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
+
 
 @app.route('/gateway-endpoint', methods=['POST'])
 def gateway_endpoint():

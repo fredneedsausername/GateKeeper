@@ -223,14 +223,18 @@ REVOKE TEMPORARY ON DATABASE gatekeeper FROM PUBLIC;
 
 ## Physical systems
 
-The solution deploys a tag system. Tags, upon entering an activator beacon's radius, publish an advertisement to a gateway that physically opens the gates of the shipyard. The advertisement is also relayed to an api endpoint of the application.
+The solution deploys a tag system. Tags send periodical signals, that get catched by an activator beacon when they enter its radius. When the signal is catched, the gates open and the app registers the person either entering or leaving the shipyard.
 
 The advertisement is comprised of 5 parts:
- - the tag's name (structured like "BE_A1900299");
- - the tag's remaining battery;
- - the activator's id;
- - the previous activator's id;
- - the tag's packet counter.
+- The advertisement header;
+- The source type;
+- the activator id;
+- The message type;
+- The packet counter;
+- The tag mac address;
+- The signal strength;
+- The packet type;
+- The battery level of the tag.
 
 ## Leaving or entering?
 
