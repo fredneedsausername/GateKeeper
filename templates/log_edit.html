@@ -37,9 +37,6 @@
             <select x-model="formData.crew_member_id" x-show="crewMembers.length > 0 || crewSearch" name="crew_member_id" required>
                 <option value="">Nessun membro equipaggio</option>
                 <option disabled x-show="crewMembers.length === 0">Nessun risultato trovato</option>
-                {% if log.crew_member_id %}
-                    <option value="{{ log.crew_member_id|e }}" selected>{{ log.crew_member_name|e }}</option>
-                {% endif %}
                 <template x-for="member in crewMembers" :key="member.id">
                     <option :value="member.id" x-text="member.name" :selected="member.id == formData.crew_member_id"></option>
                 </template>

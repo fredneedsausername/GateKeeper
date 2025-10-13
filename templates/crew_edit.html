@@ -23,9 +23,6 @@
             <select x-cloak x-model="formData.ship_id" x-show="ships.length > 0 || shipSearch" name="ship_id">
                 <option value="">Nessuna barca</option>
                 <option disabled x-show="ships.length === 0">Nessun risultato trovato</option>
-                {% if crew_member.ship_id %}
-                    <option value="{{ crew_member.ship_id|e }}" selected>{{ crew_member.ship_name|e }}</option>
-                {% endif %}
                 <template x-for="ship in ships" :key="ship.id">
                     <option :value="ship.id" x-text="ship.name" :selected="ship.id == formData.ship_id"></option>
                 </template>
