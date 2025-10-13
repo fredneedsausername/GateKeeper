@@ -461,7 +461,7 @@ def create_table_config(table_type, filters, page, request_path):
                 {"key": "role_name", "label": "Ruolo", "type": "text"}
             ],
             "text_filters": [
-                {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
+                {"key": "crew_name", "label": "Nominativo", "placeholder": "Cerca per nome..."}
             ],
             "searchable_select_filters": [
                 {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"},
@@ -602,7 +602,7 @@ def create_table_config(table_type, filters, page, request_path):
                 {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"}
             ],
             "text_filters": [
-                {"key": "crew_name", "label": "Nome Equipaggio", "placeholder": "Cerca per nome..."}
+                {"key": "crew_name", "label": "Nominativo", "placeholder": "Cerca per nome..."}
             ],
             "allow_add": True,
             "allow_edit": True,
