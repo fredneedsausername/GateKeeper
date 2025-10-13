@@ -66,6 +66,20 @@
             </select>
         </div>
         
+        <div class="base-form-group">
+            <label for="phone_number">Telefono</label>
+            <input type="tel" 
+                   id="phone_number" 
+                   name="phone_number" 
+                   x-model="formData.phone_number" 
+                   maxlength="20"
+                   value="{{ crew_member.phone_number|default('')|e }}"
+                   placeholder="Inserisci numero di telefono...">
+            <p class="text-sm text-gray-500 mt-1" 
+               x-show="formData.phone_number && formData.phone_number.length >= 15" 
+               x-text="`${formData.phone_number.length}/20 caratteri`"></p>
+        </div>
+        
         <div class="base-form-actions">
             <button type="button" @click="window.location.href='/crew'" class="base-btn-secondary">
                 Annulla
@@ -84,7 +98,8 @@ function crewEditForm(existingData) {
             name: existingData.name || '',
             ship_id: existingData.ship_id || '',
             role_id: existingData.role_id || '',
-            tag_id: existingData.tag_id || ''
+            tag_id: existingData.tag_id || '',
+            phone_number: existingData.phone_number || ''
         },
         shipSearch: existingData.ship_name || '',
         roleSearch: existingData.role_name || '',

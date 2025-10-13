@@ -60,6 +60,19 @@
             </select>
         </div>
         
+        <div class="base-form-group">
+            <label for="phone_number">Telefono</label>
+            <input type="tel" 
+                   id="phone_number" 
+                   name="phone_number" 
+                   x-model="formData.phone_number" 
+                   maxlength="20"
+                   placeholder="Inserisci numero di telefono...">
+            <p class="text-sm text-gray-500 mt-1" 
+               x-show="formData.phone_number && formData.phone_number.length >= 15" 
+               x-text="`${formData.phone_number.length}/20 caratteri`"></p>
+        </div>
+        
         <div class="base-form-actions">
             <button type="button" @click="window.location.href='/crew'" class="base-btn-secondary">
                 Annulla
@@ -78,7 +91,8 @@ function crewForm() {
             name: '',
             ship_id: '',
             role_id: '',
-            tag_id: ''
+            tag_id: '',
+            phone_number: ''
         },
         shipSearch: '',
         roleSearch: '',

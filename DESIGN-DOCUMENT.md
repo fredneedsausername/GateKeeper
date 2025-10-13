@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS crew_member (
     role_id INTEGER,
     ship_id INTEGER,
     tag_id INTEGER,
+    phone_number VARCHAR(20) DEFAULT NULL,
     CONSTRAINT fk_crew_role 
         FOREIGN KEY (role_id) 
         REFERENCES crew_member_roles(id) 

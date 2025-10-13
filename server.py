@@ -139,6 +139,7 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
             select_fields = """
                 cm.id,
                 cm.name as crew_member_name,
+                cm.phone_number,
                 cr.role_name,
                 s.name as ship_name,
                 t.mac_address as tag_name,
@@ -458,7 +459,8 @@ def create_table_config(table_type, filters, page, request_path):
                 {"key": "battery_level", "label": "🔋%", "type": "battery"},
                 {"key": "ship_name", "label": "Nave", "type": "text"},
                 {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
-                {"key": "role_name", "label": "Ruolo", "type": "text"}
+                {"key": "role_name", "label": "Ruolo", "type": "text"},
+                {"key": "phone_number", "label": "Telefono", "type": "text"}
             ],
             "text_filters": [
                 {"key": "crew_name", "label": "Nominativo", "placeholder": "Cerca per nome..."}
@@ -703,6 +705,7 @@ def add_crew(curs):
             ship_id = request.form.get('ship_id') or None
             role_id = request.form.get('role_id') or None
             tag_id = request.form.get('tag_id') or None
+            phone_number = request.form.get('phone_number') or None
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
@@ -710,8 +713,8 @@ def add_crew(curs):
             # Use database constraint to enforce tag uniqueness
             try:
                 curs.execute(
-                    "INSERT INTO crew_member (name, ship_id, role_id, tag_id) VALUES (%s, %s, %s, %s)",
-                    [name, ship_id, role_id, tag_id]
+                    "INSERT INTO crew_member (name, ship_id, role_id, tag_id, phone_number) VALUES (%s, %s, %s, %s, %s)",
+                    [name, ship_id, role_id, tag_id, phone_number]
                 )
                 flash('Crew member aggiunto con successo', 'success')
                 return redirect('/crew')
@@ -736,6 +739,7 @@ def edit_crew(curs, crew_id):
             ship_id = request.form.get('ship_id') or None
             role_id = request.form.get('role_id') or None
             tag_id = request.form.get('tag_id') or None
+            phone_number = request.form.get('phone_number') or None
             if not name:
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
@@ -743,8 +747,8 @@ def edit_crew(curs, crew_id):
             # Use database constraint to enforce tag uniqueness
             try:
                 curs.execute(
-                    "UPDATE crew_member SET name = %s, ship_id = %s, role_id = %s, tag_id = %s WHERE id = %s",
-                    [name, ship_id, role_id, tag_id, crew_id]
+                    "UPDATE crew_member SET name = %s, ship_id = %s, role_id = %s, tag_id = %s, phone_number = %s WHERE id = %s",
+                    [name, ship_id, role_id, tag_id, phone_number, crew_id]
                 )
                 flash('Crew member aggiornato con successo', 'success')
                 return redirect('/crew')
