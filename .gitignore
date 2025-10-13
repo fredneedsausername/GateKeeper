@@ -200,3 +200,4 @@ alpine.min.js
 htmx.min.js
 beacon_dump.txt
 tests.py
+.vscode/
