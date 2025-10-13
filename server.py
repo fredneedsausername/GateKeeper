@@ -457,7 +457,7 @@ def create_table_config(table_type, filters, page, request_path):
             "columns": [
                 {"key": "tag_name", "label": "Tag", "type": "text"},
                 {"key": "battery_level", "label": "🔋%", "type": "battery"},
-                {"key": "ship_name", "label": "Nave", "type": "text"},
+                {"key": "ship_name", "label": "Barca", "type": "text"},
                 {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
                 {"key": "role_name", "label": "Ruolo", "type": "text"},
                 {"key": "phone_number", "label": "Telefono", "type": "text"}
@@ -466,7 +466,7 @@ def create_table_config(table_type, filters, page, request_path):
                 {"key": "crew_name", "label": "Nominativo", "placeholder": "Cerca per nome..."}
             ],
             "searchable_select_filters": [
-                {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"},
+                {"key": "ship_id", "label": "Barca", "placeholder": "Cerca barca...", "search_endpoint": "/api/ships/filter"},
                 {"key": "role_id", "label": "Ruolo", "placeholder": "Cerca ruolo...", "search_endpoint": "/api/roles/filter"}
             ],
             "allow_add": True,
@@ -484,19 +484,19 @@ def create_table_config(table_type, filters, page, request_path):
     
     elif table_type == "ship":
         return {
-            "title": "Gestione Navi",
-            "description": "Visualizza e gestisci le navi",
+            "title": "Gestione Barche",
+            "description": "Visualizza e gestisci le barche",
             "columns": [
-                {"key": "name", "label": "Nave", "type": "text"}
+                {"key": "name", "label": "Barca", "type": "text"}
             ],
             "text_filters": [
-                {"key": "ship_name", "label": "Nome Nave", "placeholder": "Cerca per nome..."}
+                {"key": "ship_name", "label": "Nome Barca", "placeholder": "Cerca per nome..."}
             ],
             "allow_add": True,
             "allow_edit": True,
             "allow_delete": True,
-            "add_button_text": "Aggiungi Nave",
-            "empty_message": "Applica dei filtri per visualizzare le navi.",
+            "add_button_text": "Aggiungi Barca",
+            "empty_message": "Applica dei filtri per visualizzare le barche.",
             "add_url": "/navi/add",
             "edit_url": "/navi/edit/{id}",
             "delete_url": "/api/ships/delete/{id}",
@@ -581,7 +581,7 @@ def create_table_config(table_type, filters, page, request_path):
                 {"key": "shipyard_name", "label": "Cantiere", "type": "text"},
                 {"key": "current_tag_name", "label": "Tag", "type": "text"},
                 {"key": "current_battery_level", "label": "🔋%", "type": "battery"},
-                {"key": "ship_name", "label": "Nave", "type": "text"},
+                {"key": "ship_name", "label": "Barca", "type": "text"},
                 {"key": "crew_member_name", "label": "Equipaggio", "type": "text"},
                 {"key": "role_name", "label": "Ruolo", "type": "text"},
                 {"key": "entry_timestamp", "label": "Entrata", "type": "datetime"},
@@ -601,7 +601,7 @@ def create_table_config(table_type, filters, page, request_path):
             ],
             "searchable_select_filters": [
                 {"key": "shipyard_id", "label": "Cantiere", "placeholder": "Cerca cantiere...", "search_endpoint": "/api/shipyards/filter"},
-                {"key": "ship_id", "label": "Nave", "placeholder": "Cerca nave...", "search_endpoint": "/api/ships/filter"}
+                {"key": "ship_id", "label": "Barca", "placeholder": "Cerca barca...", "search_endpoint": "/api/ships/filter"}
             ],
             "text_filters": [
                 {"key": "crew_name", "label": "Nominativo", "placeholder": "Cerca per nome..."}
@@ -826,7 +826,7 @@ def add_ship(curs):
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
             curs.execute("INSERT INTO ship (name) VALUES (%s)", [name])
-            flash('Nave aggiunta con successo', 'success')
+            flash('Barca aggiunta con successo', 'success')
             return redirect('/navi')
         except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
             flash(f'Errore database: {str(e)}', 'error')
@@ -847,7 +847,7 @@ def edit_ship(curs, ship_id):
                 flash('Nome è obbligatorio', 'error')
                 return redirect(request.url)
             curs.execute("UPDATE ship SET name = %s WHERE id = %s", [name, ship_id])
-            flash('Nave aggiornata con successo', 'success')
+            flash('Barca aggiornata con successo', 'success')
             return redirect('/navi')
         except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
             flash(f'Errore database: {str(e)}', 'error')
@@ -859,7 +859,7 @@ def edit_ship(curs, ship_id):
     curs.execute("SELECT * FROM ship WHERE id = %s", [ship_id])
     ship = curs.fetchone()
     if not ship:
-        flash('Nave non trovata', 'error')
+        flash('Barca non trovata', 'error')
         return redirect('/navi')
     return render_template('ship_edit.html', ship=ship)
 
@@ -869,7 +869,7 @@ def edit_ship(curs, ship_id):
 def delete_ship(curs, ship_id):
     try:
         curs.execute("DELETE FROM ship WHERE id = %s", [ship_id])
-        return jsonify({"success": True, "message": "Nave eliminata con successo"})
+        return jsonify({"success": True, "message": "Barca eliminata con successo"})
     except (psycopg.DatabaseError, psycopg.InterfaceError) as e:
         return jsonify({"success": False, "error": f"Errore database: {str(e)}"}), 500
     except Exception as e:

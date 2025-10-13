@@ -2,12 +2,12 @@
 
 {% block body %}
 <div class="base-content-card">
-    <h2 class="base-content-title">Aggiungi Nave</h2>
-    <p class="base-content-description">Inserisci i dati della nuova nave</p>
+    <h2 class="base-content-title">Aggiungi Barca</h2>
+    <p class="base-content-description">Inserisci i dati della nuova barca</p>
     
     <form method="POST" x-data="{ nameValue: '' }">
         <div class="base-form-group">
-            <label for="name">Nome Nave *</label>
+            <label for="name">Nome Barca *</label>
             <input type="text" id="name" name="name" x-model="nameValue" required maxlength="100">
             <p class="text-sm text-gray-500 mt-1" x-show="nameValue.length >= 90" x-text="`${nameValue.length}/100 caratteri`"></p>
         </div>
@@ -17,7 +17,7 @@
                 Annulla
             </button>
             <button type="submit" class="base-btn-primary">
-                Crea Nave
+                Crea Barca
             </button>
         </div>
     </form>

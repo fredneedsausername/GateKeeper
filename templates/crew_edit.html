@@ -13,15 +13,15 @@
         </div>
         
         <div class="base-form-group">
-            <label for="ship">Nave</label>
+            <label for="ship">Barca</label>
             <input type="text" 
                    x-model="shipSearch" 
                    @focus="searchShips()"
                    @input.debounce.500ms="searchShips()"
-                   placeholder="Cerca nave..."
+                   placeholder="Cerca barca..."
                    value="{{ crew_member.ship_name|default('')|e }}">
             <select x-cloak x-model="formData.ship_id" x-show="ships.length > 0 || shipSearch" name="ship_id">
-                <option value="">Nessuna nave</option>
+                <option value="">Nessuna barca</option>
                 <option disabled x-show="ships.length === 0">Nessun risultato trovato</option>
                 {% if crew_member.ship_id %}
                     <option value="{{ crew_member.ship_id|e }}" selected>{{ crew_member.ship_name|e }}</option>
