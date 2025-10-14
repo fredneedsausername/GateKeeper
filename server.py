@@ -590,13 +590,15 @@ def create_table_config(table_type, filters, page, request_path):
             "allow_add": False,
             "allow_edit": False,
             "allow_delete": True,
+            "allow_export": True,  # ADD THIS LINE
             "empty_message": "Nessuna entry trovata nel periodo selezionato.",
             "delete_url": "/api/entries/delete/{id}",
+            "export_url": "/entry/export",  # ADD THIS LINE
             "data": data,
             "total_count": total_count,
             "page": page
         }
-    
+
     elif table_type == "permanence_log":
         return {
             "title": "Log Permanenze",
@@ -1146,6 +1148,121 @@ def export_logs():
         print(f"Error in export_logs: {e}")
         flash(f'Errore durante l\'esportazione: {str(e)}', 'error')
         return redirect('/log')
+
+
+@app.route('/entry/export')
+@auth_required
+def export_entries():
+    """Export filtered entries to Excel file"""
+    try:
+        # Get filters from URL parameters (no defaults - use what's in URL)
+        filters = {
+            'start_timestamp': request.args.get('start_timestamp'),
+            'end_timestamp': request.args.get('end_timestamp'),
+            'shipyard_id': request.args.get('shipyard_id', ''),
+            'tag_name': request.args.get('tag_name', '')
+        }
+        
+        # Fetch up to 10,000 rows matching the filters
+        data, total_count = get_filtered_data('unassigned_tag_entry', filters, page=1, page_size=10000)
+        
+        # Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Tag Entries"
+        
+        # Define headers (exact order from the table)
+        headers = ['Cantiere', 'Tag', '🔋%', 'Passaggio', 'Tipologia']
+        
+        # Define styles
+        header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Border style
+        thin_border = Border(
+            left=Side(style='thin', color='E5E7EB'),
+            right=Side(style='thin', color='E5E7EB'),
+            top=Side(style='thin', color='E5E7EB'),
+            bottom=Side(style='thin', color='E5E7EB')
+        )
+        
+        # Cell alignment
+        center_alignment = Alignment(horizontal='center', vertical='center')
+        left_alignment = Alignment(horizontal='left', vertical='center')
+        
+        # Write headers with formatting
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        # Write data rows with minimal styling
+        for row_num, row_data in enumerate(data, 2):
+            # Cantiere
+            cell = ws.cell(row=row_num, column=1, value=row_data.get('shipyard_name', ''))
+            cell.border = thin_border
+            cell.alignment = left_alignment
+            
+            # Tag
+            cell = ws.cell(row=row_num, column=2, value=row_data.get('tag_name', ''))
+            cell.border = thin_border
+            cell.alignment = left_alignment
+            
+            # Battery percentage
+            battery = row_data.get('battery_level')
+            cell = ws.cell(row=row_num, column=3, value=battery if battery is not None else '')
+            cell.border = thin_border
+            cell.alignment = center_alignment
+            
+            # Passaggio (advertisement_timestamp)
+            adv_ts = row_data.get('advertisement_timestamp')
+            cell = ws.cell(row=row_num, column=4, value=adv_ts.strftime('%d/%m/%Y %H:%M:%S') if adv_ts else '')
+            cell.border = thin_border
+            cell.alignment = center_alignment
+            
+            # Tipologia (entry_type: "Ingresso" or "Uscita")
+            cell = ws.cell(row=row_num, column=5, value=row_data.get('entry_type', ''))
+            cell.border = thin_border
+            cell.alignment = center_alignment
+        
+        # Auto-adjust column widths
+        column_widths = {
+            'A': 15,  # Cantiere
+            'B': 15,  # Tag
+            'C': 8,   # Battery
+            'D': 20,  # Passaggio
+            'E': 12   # Tipologia
+        }
+        
+        for col_letter, width in column_widths.items():
+            ws.column_dimensions[col_letter].width = width
+        
+        # Set row height for header
+        ws.row_dimensions[1].height = 25
+        
+        # Freeze header row
+        ws.freeze_panes = 'A2'
+        
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # Return file for download
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='Tag_Entries.xlsx'
+        )
+        
+    except Exception as e:
+        print(f"Error in export_entries: {e}")
+        flash(f'Errore durante l\'esportazione: {str(e)}', 'error')
+        return redirect('/entry')
 
 
 @app.route('/log/add', methods=['GET', 'POST'])
