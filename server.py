@@ -301,7 +301,12 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 start_ts = filters['start_timestamp']
                 if isinstance(start_ts, str):
                     try:
-                        start_ts = datetime.fromisoformat(start_ts.replace('T', ' '))
+                        timestamp_str = start_ts.replace('T', ' ')
+                        # datetime-local inputs give 'YYYY-MM-DD HH:MM' without seconds
+                        # fromisoformat needs 'YYYY-MM-DD HH:MM:SS'
+                        if timestamp_str.count(':') == 1:
+                            timestamp_str += ':00'
+                        start_ts = datetime.fromisoformat(timestamp_str)
                     except:
                         start_ts = datetime.now() - timedelta(hours=24)
                 filter_conditions += " AND ute.advertisement_timestamp >= %s"
@@ -311,7 +316,12 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 end_ts = filters['end_timestamp']
                 if isinstance(end_ts, str):
                     try:
-                        end_ts = datetime.fromisoformat(end_ts.replace('T', ' '))
+                        timestamp_str = end_ts.replace('T', ' ')
+                        # datetime-local inputs give 'YYYY-MM-DD HH:MM' without seconds
+                        # fromisoformat needs 'YYYY-MM-DD HH:MM:SS'
+                        if timestamp_str.count(':') == 1:
+                            timestamp_str += ':00'
+                        end_ts = datetime.fromisoformat(timestamp_str)
                     except:
                         end_ts = datetime.now()
                 filter_conditions += " AND ute.advertisement_timestamp <= %s"
@@ -378,23 +388,34 @@ def get_filtered_data(table_type, filters, page=1, page_size=50):
                 
                 if isinstance(start_ts, str):
                     try:
-                        start_ts = datetime.fromisoformat(start_ts.replace('T', ' '))
+                        timestamp_str = start_ts.replace('T', ' ')
+                        # datetime-local inputs give 'YYYY-MM-DD HH:MM' without seconds
+                        # fromisoformat needs 'YYYY-MM-DD HH:MM:SS'
+                        if timestamp_str.count(':') == 1:
+                            timestamp_str += ':00'
+                        start_ts = datetime.fromisoformat(timestamp_str)
                     except:
                         start_ts = datetime.now() - timedelta(hours=24)
                         
                 if isinstance(end_ts, str):
                     try:
-                        end_ts = datetime.fromisoformat(end_ts.replace('T', ' '))
+                        timestamp_str = end_ts.replace('T', ' ')
+                        # datetime-local inputs give 'YYYY-MM-DD HH:MM' without seconds
+                        # fromisoformat needs 'YYYY-MM-DD HH:MM:SS'
+                        if timestamp_str.count(':') == 1:
+                            timestamp_str += ':00'
+                        end_ts = datetime.fromisoformat(timestamp_str)
                     except:
                         end_ts = datetime.now()
                 
+                # Show log if entry OR exit is within the date range
                 filter_conditions += """
                     AND (
-                        (pl.entry_timestamp <= %s AND (pl.leave_timestamp IS NULL OR pl.leave_timestamp >= %s))
-                        OR (pl.entry_timestamp >= %s AND pl.entry_timestamp <= %s)
+                        (pl.entry_timestamp >= %s AND pl.entry_timestamp <= %s)
+                        OR (pl.leave_timestamp >= %s AND pl.leave_timestamp <= %s)
                     )
                 """
-                params.extend([end_ts, start_ts, start_ts, end_ts])
+                params.extend([start_ts, end_ts, start_ts, end_ts])
             
             if filters.get('shipyard_id') and filters['shipyard_id'].strip():
                 try:
@@ -990,6 +1011,97 @@ def logs_page():
     # Return full page for regular requests
     return render_template('logs.html', table_config=table_config)
 
+@app.route('/log/export')
+@auth_required
+def export_logs():
+    """Export filtered logs to Excel file"""
+    try:
+        # Get filters from URL parameters (no defaults - use what's in URL)
+        filters = {
+            'start_timestamp': request.args.get('start_timestamp'),
+            'end_timestamp': request.args.get('end_timestamp'),
+            'shipyard_id': request.args.get('shipyard_id', ''),
+            'ship_id': request.args.get('ship_id', ''),
+            'crew_name': request.args.get('crew_name', '')
+        }
+        
+        # Fetch up to 10,000 rows matching the filters
+        data, total_count = get_filtered_data('permanence_log', filters, page=1, page_size=10000)
+        
+        # Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Permanenze"
+        
+        # Define headers (exact order from the table)
+        headers = ['Cantiere', 'Tag', '🔋%', 'Barca', 'Equipaggio', 'Ruolo', 'Entrata', 'Uscita']
+        
+        # Write headers with formatting
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Write data rows
+        for row_num, row_data in enumerate(data, 2):
+            ws.cell(row=row_num, column=1, value=row_data.get('shipyard_name', ''))
+            ws.cell(row=row_num, column=2, value=row_data.get('current_tag_name', ''))
+            
+            # Battery percentage
+            battery = row_data.get('current_battery_level')
+            ws.cell(row=row_num, column=3, value=battery if battery is not None else '')
+            
+            ws.cell(row=row_num, column=4, value=row_data.get('ship_name', ''))
+            ws.cell(row=row_num, column=5, value=row_data.get('crew_member_name', ''))
+            ws.cell(row=row_num, column=6, value=row_data.get('role_name', ''))
+            
+            # Format datetime columns
+            entry_ts = row_data.get('entry_timestamp')
+            if entry_ts:
+                ws.cell(row=row_num, column=7, value=entry_ts.strftime('%d/%m/%Y %H:%M:%S'))
+            else:
+                ws.cell(row=row_num, column=7, value='')
+            
+            leave_ts = row_data.get('leave_timestamp')
+            if leave_ts:
+                ws.cell(row=row_num, column=8, value=leave_ts.strftime('%d/%m/%Y %H:%M:%S'))
+            else:
+                ws.cell(row=row_num, column=8, value='')
+        
+        # Auto-adjust column widths
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column].width = adjusted_width
+        
+        # Freeze header row
+        ws.freeze_panes = 'A2'
+        
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # Return file for download
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='Permanenze.xlsx'
+        )
+        
+    except Exception as e:
+        print(f"Error in export_logs: {e}")
+        flash(f'Errore durante l\'esportazione: {str(e)}', 'error')
+        return redirect('/log')
+
 @app.route('/log/add', methods=['GET', 'POST'])
 @auth_required
 @connected_to_database
@@ -1487,102 +1599,6 @@ def gateway_endpoint():
         process_device(device)
 
     return "Processed", 200
-
-
-@app.route('/log/export')
-@auth_required
-@connected_to_database
-def export_logs(curs):
-    """Export filtered logs to Excel file"""
-    try:
-        # Get filters from URL parameters (same as logs_page)
-        now = datetime.now()
-        yesterday = now - timedelta(hours=24)
-        
-        filters = {
-            'start_timestamp': request.args.get('start_timestamp', yesterday.strftime('%Y-%m-%dT%H:%M')),
-            'end_timestamp': request.args.get('end_timestamp', now.strftime('%Y-%m-%dT%H:%M')),
-            'shipyard_id': request.args.get('shipyard_id', ''),
-            'ship_id': request.args.get('ship_id', ''),
-            'crew_name': request.args.get('crew_name', '')
-        }
-        
-        # Fetch up to 10,000 rows matching the filters
-        data, total_count = get_filtered_data('permanence_log', filters, page=1, page_size=10000)
-        
-        # Create Excel workbook
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Permanenze"
-        
-        # Define headers (exact order from the table)
-        headers = ['Cantiere', 'Tag', '🔋%', 'Barca', 'Equipaggio', 'Ruolo', 'Entrata', 'Uscita']
-        
-        # Write headers with formatting
-        for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col_num, value=header)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
-        
-        # Write data rows
-        for row_num, row_data in enumerate(data, 2):
-            ws.cell(row=row_num, column=1, value=row_data.get('shipyard_name', ''))
-            ws.cell(row=row_num, column=2, value=row_data.get('current_tag_name', ''))
-            
-            # Battery percentage
-            battery = row_data.get('current_battery_level')
-            ws.cell(row=row_num, column=3, value=battery if battery is not None else '')
-            
-            ws.cell(row=row_num, column=4, value=row_data.get('ship_name', ''))
-            ws.cell(row=row_num, column=5, value=row_data.get('crew_member_name', ''))
-            ws.cell(row=row_num, column=6, value=row_data.get('role_name', ''))
-            
-            # Format datetime columns
-            entry_ts = row_data.get('entry_timestamp')
-            if entry_ts:
-                ws.cell(row=row_num, column=7, value=entry_ts.strftime('%d/%m/%Y %H:%M:%S'))
-            else:
-                ws.cell(row=row_num, column=7, value='')
-            
-            leave_ts = row_data.get('leave_timestamp')
-            if leave_ts:
-                ws.cell(row=row_num, column=8, value=leave_ts.strftime('%d/%m/%Y %H:%M:%S'))
-            else:
-                ws.cell(row=row_num, column=8, value='')
-        
-        # Auto-adjust column widths
-        for col in ws.columns:
-            max_length = 0
-            column = col[0].column_letter
-            for cell in col:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)
-            ws.column_dimensions[column].width = adjusted_width
-        
-        # Freeze header row
-        ws.freeze_panes = 'A2'
-        
-        # Save to BytesIO
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        # Return file for download
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name='Permanenze.xlsx'
-        )
-        
-    except Exception as e:
-        print(f"Error in export_logs: {e}")
-        flash(f'Errore durante l\'esportazione: {str(e)}', 'error')
-        return redirect('/log')
 
 
 if __name__ == "__main__":
