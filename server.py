@@ -1,4 +1,4 @@
-from flask import Flask, request, session, redirect, render_template, jsonify, flash
+from flask import Flask, request, session, redirect, render_template, jsonify, flash, send_file
 from waitress import serve
 from psycopg.rows import dict_row
 import os
@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 import base64
 from typing import TypeVar, ParamSpec, Callable, Concatenate, Any
 import psycopg
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+from io import BytesIO
 
 # Type variables for typing the decorator
 P = ParamSpec('P')
@@ -609,11 +612,13 @@ def create_table_config(table_type, filters, page, request_path):
             "allow_add": True,
             "allow_edit": True,
             "allow_delete": True,
+            "allow_export": True,
             "add_button_text": "Aggiungi Log",
             "empty_message": "Nessun log trovato nel periodo selezionato.",
             "add_url": "/log/add",
             "edit_url": "/log/edit/{id}",
             "delete_url": "/api/logs/delete/{id}",
+            "export_url": "/log/export",
             "data": data,
             "total_count": total_count,
             "page": page
@@ -1482,6 +1487,102 @@ def gateway_endpoint():
         process_device(device)
 
     return "Processed", 200
+
+
+@app.route('/log/export')
+@auth_required
+@connected_to_database
+def export_logs(curs):
+    """Export filtered logs to Excel file"""
+    try:
+        # Get filters from URL parameters (same as logs_page)
+        now = datetime.now()
+        yesterday = now - timedelta(hours=24)
+        
+        filters = {
+            'start_timestamp': request.args.get('start_timestamp', yesterday.strftime('%Y-%m-%dT%H:%M')),
+            'end_timestamp': request.args.get('end_timestamp', now.strftime('%Y-%m-%dT%H:%M')),
+            'shipyard_id': request.args.get('shipyard_id', ''),
+            'ship_id': request.args.get('ship_id', ''),
+            'crew_name': request.args.get('crew_name', '')
+        }
+        
+        # Fetch up to 10,000 rows matching the filters
+        data, total_count = get_filtered_data('permanence_log', filters, page=1, page_size=10000)
+        
+        # Create Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Permanenze"
+        
+        # Define headers (exact order from the table)
+        headers = ['Cantiere', 'Tag', '🔋%', 'Barca', 'Equipaggio', 'Ruolo', 'Entrata', 'Uscita']
+        
+        # Write headers with formatting
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Write data rows
+        for row_num, row_data in enumerate(data, 2):
+            ws.cell(row=row_num, column=1, value=row_data.get('shipyard_name', ''))
+            ws.cell(row=row_num, column=2, value=row_data.get('current_tag_name', ''))
+            
+            # Battery percentage
+            battery = row_data.get('current_battery_level')
+            ws.cell(row=row_num, column=3, value=battery if battery is not None else '')
+            
+            ws.cell(row=row_num, column=4, value=row_data.get('ship_name', ''))
+            ws.cell(row=row_num, column=5, value=row_data.get('crew_member_name', ''))
+            ws.cell(row=row_num, column=6, value=row_data.get('role_name', ''))
+            
+            # Format datetime columns
+            entry_ts = row_data.get('entry_timestamp')
+            if entry_ts:
+                ws.cell(row=row_num, column=7, value=entry_ts.strftime('%d/%m/%Y %H:%M:%S'))
+            else:
+                ws.cell(row=row_num, column=7, value='')
+            
+            leave_ts = row_data.get('leave_timestamp')
+            if leave_ts:
+                ws.cell(row=row_num, column=8, value=leave_ts.strftime('%d/%m/%Y %H:%M:%S'))
+            else:
+                ws.cell(row=row_num, column=8, value='')
+        
+        # Auto-adjust column widths
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column].width = adjusted_width
+        
+        # Freeze header row
+        ws.freeze_panes = 'A2'
+        
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # Return file for download
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='Permanenze.xlsx'
+        )
+        
+    except Exception as e:
+        print(f"Error in export_logs: {e}")
+        flash(f'Errore durante l\'esportazione: {str(e)}', 'error')
+        return redirect('/log')
 
 
 if __name__ == "__main__":
