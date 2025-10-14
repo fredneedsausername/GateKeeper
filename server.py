@@ -9,7 +9,7 @@ import base64
 from typing import TypeVar, ParamSpec, Callable, Concatenate, Any
 import psycopg
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from io import BytesIO
 
 # Type variables for typing the decorator
@@ -1011,6 +1011,7 @@ def logs_page():
     # Return full page for regular requests
     return render_template('logs.html', table_config=table_config)
 
+
 @app.route('/log/export')
 @auth_required
 def export_logs():
@@ -1036,50 +1037,94 @@ def export_logs():
         # Define headers (exact order from the table)
         headers = ['Cantiere', 'Tag', '🔋%', 'Barca', 'Equipaggio', 'Ruolo', 'Entrata', 'Uscita']
         
+        # Define styles
+        header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Border style
+        thin_border = Border(
+            left=Side(style='thin', color='E5E7EB'),
+            right=Side(style='thin', color='E5E7EB'),
+            top=Side(style='thin', color='E5E7EB'),
+            bottom=Side(style='thin', color='E5E7EB')
+        )
+        
+        # Cell alignment
+        center_alignment = Alignment(horizontal='center', vertical='center')
+        left_alignment = Alignment(horizontal='left', vertical='center')
+        
         # Write headers with formatting
         for col_num, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col_num, value=header)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
         
-        # Write data rows
+        # Write data rows with minimal styling
         for row_num, row_data in enumerate(data, 2):
-            ws.cell(row=row_num, column=1, value=row_data.get('shipyard_name', ''))
-            ws.cell(row=row_num, column=2, value=row_data.get('current_tag_name', ''))
+            # Cantiere
+            cell = ws.cell(row=row_num, column=1, value=row_data.get('shipyard_name', ''))
+            cell.border = thin_border
+            cell.alignment = left_alignment
+            
+            # Tag
+            cell = ws.cell(row=row_num, column=2, value=row_data.get('current_tag_name', ''))
+            cell.border = thin_border
+            cell.alignment = left_alignment
             
             # Battery percentage
             battery = row_data.get('current_battery_level')
-            ws.cell(row=row_num, column=3, value=battery if battery is not None else '')
+            cell = ws.cell(row=row_num, column=3, value=battery if battery is not None else '')
+            cell.border = thin_border
+            cell.alignment = center_alignment
             
-            ws.cell(row=row_num, column=4, value=row_data.get('ship_name', ''))
-            ws.cell(row=row_num, column=5, value=row_data.get('crew_member_name', ''))
-            ws.cell(row=row_num, column=6, value=row_data.get('role_name', ''))
+            # Barca
+            cell = ws.cell(row=row_num, column=4, value=row_data.get('ship_name', ''))
+            cell.border = thin_border
+            cell.alignment = left_alignment
             
-            # Format datetime columns
+            # Equipaggio
+            cell = ws.cell(row=row_num, column=5, value=row_data.get('crew_member_name', ''))
+            cell.border = thin_border
+            cell.alignment = left_alignment
+            cell.font = Font(bold=True)
+            
+            # Ruolo
+            cell = ws.cell(row=row_num, column=6, value=row_data.get('role_name', ''))
+            cell.border = thin_border
+            cell.alignment = left_alignment
+            
+            # Entrata
             entry_ts = row_data.get('entry_timestamp')
-            if entry_ts:
-                ws.cell(row=row_num, column=7, value=entry_ts.strftime('%d/%m/%Y %H:%M:%S'))
-            else:
-                ws.cell(row=row_num, column=7, value='')
+            cell = ws.cell(row=row_num, column=7, value=entry_ts.strftime('%d/%m/%Y %H:%M:%S') if entry_ts else '')
+            cell.border = thin_border
+            cell.alignment = center_alignment
             
+            # Uscita
             leave_ts = row_data.get('leave_timestamp')
-            if leave_ts:
-                ws.cell(row=row_num, column=8, value=leave_ts.strftime('%d/%m/%Y %H:%M:%S'))
-            else:
-                ws.cell(row=row_num, column=8, value='')
+            cell = ws.cell(row=row_num, column=8, value=leave_ts.strftime('%d/%m/%Y %H:%M:%S') if leave_ts else '')
+            cell.border = thin_border
+            cell.alignment = center_alignment
         
-        # Auto-adjust column widths
-        for col in ws.columns:
-            max_length = 0
-            column = col[0].column_letter
-            for cell in col:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)
-            ws.column_dimensions[column].width = adjusted_width
+        # Auto-adjust column widths with better sizing
+        column_widths = {
+            'A': 15,  # Cantiere
+            'B': 15,  # Tag
+            'C': 8,   # Battery
+            'D': 15,  # Barca
+            'E': 20,  # Equipaggio
+            'F': 15,  # Ruolo
+            'G': 20,  # Entrata
+            'H': 20   # Uscita
+        }
+        
+        for col_letter, width in column_widths.items():
+            ws.column_dimensions[col_letter].width = width
+        
+        # Set row height for header
+        ws.row_dimensions[1].height = 25
         
         # Freeze header row
         ws.freeze_panes = 'A2'
@@ -1101,6 +1146,7 @@ def export_logs():
         print(f"Error in export_logs: {e}")
         flash(f'Errore durante l\'esportazione: {str(e)}', 'error')
         return redirect('/log')
+
 
 @app.route('/log/add', methods=['GET', 'POST'])
 @auth_required
