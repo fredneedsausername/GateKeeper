@@ -1582,6 +1582,66 @@ def filter_shipyards(curs):
     return jsonify({"options": options})
 
 
+# print("mac         |echo |rssi (dbm)|count|scan time   |HH:MM:SS.MMMMMM")
+# print("------------+-----+----------+-----+------------+---------------")
+
+# def print_formatted_data(mac, echo, rssi, count, scan_time):
+
+#     now = datetime.now()
+
+#     # Format as HH:MM:SS.MMMMMM
+#     time_str = now.strftime("%H:%M:%S.%f")
+
+#     print(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}|{scan_time.ljust(12)}|{time_str.ljust(15)}")
+
+# @app.route('/gateway-endpoint', methods=['POST'])
+# def gateway_endpoint():
+#     json_data = request.json
+
+#     data = json_data.get("data")
+#     if not data:
+#         return "Invalid gateway message", 400
+
+#     value = data.get("value")
+#     if not value:
+#         return "Invalid gateway message", 400
+    
+#     device_list = value.get("device_list")
+#     if not device_list:
+#         return "Invalid gateway message", 400
+    
+#     for device in device_list:
+        
+#         device_data = device.get("data")
+#         if not device_data:
+#             return "Invalid gateway message", 400
+        
+#         scan_time = device.get("scan_time")
+#         if not scan_time:        
+#             return "Invalid gateway message", 400
+        
+#         scan_time = str(scan_time)
+        
+#         device_data = device_data[16:] # Skip header
+
+#         unprocessed_echobeacon_id = device_data[:4]
+#         packet_type = device_data[4:6]
+#         packet_counter = device_data[6:8]
+#         mac_address = device_data[8:20]
+#         unprocessed_rssi = device_data[20:22]
+
+#         # Only consider echo packets
+#         if packet_type != "03":
+#             continue
+
+#         echobeacon_id = str(int(unprocessed_echobeacon_id, 16))
+#         rssi_dbm = str(int(unprocessed_rssi, 16) - 256)
+
+#         print_formatted_data(mac_address, echobeacon_id, rssi_dbm, packet_counter, scan_time)
+    
+#     return "Processed correctly", 200
+
+
 # Used to determine remaining battery percentage
 BATTERY_MAX_MILLIVOLTS = 3000
 
