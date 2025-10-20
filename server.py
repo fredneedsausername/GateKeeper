@@ -31,6 +31,8 @@ def get_env(env_var: str):
         raise Exception(f"{env_var} not found")
     return ret
 
+flask_env = get_env("FLASK_ENV")
+
 db_url = get_env("DATABASE_URL")
 db_pool = ConnectionPool(
     conninfo=db_url,
@@ -1582,250 +1584,252 @@ def filter_shipyards(curs):
     return jsonify({"options": options})
 
 
-# print("mac         |echo |rssi (dbm)|count|scan time   |HH:MM:SS.MMMMMM")
-# print("------------+-----+----------+-----+------------+---------------")
+if flask_env == 'development':
+    print("mac         |echo |rssi (dbm)|count|scan time   |HH:MM:SS.MMMMMM")
+    print("------------+-----+----------+-----+------------+---------------")
 
-# def print_formatted_data(mac, echo, rssi, count, scan_time):
+    def print_formatted_data(mac, echo, rssi, count, scan_time):
 
-#     now = datetime.now()
+        now = datetime.now()
 
-#     # Format as HH:MM:SS.MMMMMM
-#     time_str = now.strftime("%H:%M:%S.%f")
+        # Format as HH:MM:SS.MMMMMM
+        time_str = now.strftime("%H:%M:%S.%f")
 
-#     print(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}|{scan_time.ljust(12)}|{time_str.ljust(15)}")
+        print(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}|{scan_time.ljust(12)}|{time_str.ljust(15)}")
 
-# @app.route('/gateway-endpoint', methods=['POST'])
-# def gateway_endpoint():
-#     json_data = request.json
+    @app.route('/gateway-endpoint', methods=['POST'])
+    def gateway_endpoint():
+        json_data = request.json
 
-#     data = json_data.get("data")
-#     if not data:
-#         return "Invalid gateway message", 400
+        data = json_data.get("data")
+        if not data:
+            return "Invalid gateway message", 400
 
-#     value = data.get("value")
-#     if not value:
-#         return "Invalid gateway message", 400
-    
-#     device_list = value.get("device_list")
-#     if not device_list:
-#         return "Invalid gateway message", 400
-    
-#     for device in device_list:
+        value = data.get("value")
+        if not value:
+            return "Invalid gateway message", 400
         
-#         device_data = device.get("data")
-#         if not device_data:
-#             return "Invalid gateway message", 400
+        device_list = value.get("device_list")
+        if not device_list:
+            return "Invalid gateway message", 400
         
-#         scan_time = device.get("scan_time")
-#         if not scan_time:        
-#             return "Invalid gateway message", 400
+        for device in device_list:
+            
+            device_data = device.get("data")
+            if not device_data:
+                return "Invalid gateway message", 400
+            
+            scan_time = device.get("scan_time")
+            if not scan_time:        
+                return "Invalid gateway message", 400
+            
+            scan_time = str(scan_time)
+            
+            device_data = device_data[16:] # Skip header
+
+            unprocessed_echobeacon_id = device_data[:4]
+            packet_type = device_data[4:6]
+            packet_counter = device_data[6:8]
+            mac_address = device_data[8:20]
+            unprocessed_rssi = device_data[20:22]
+
+            # Only consider echo packets
+            if packet_type != "03":
+                continue
+
+            echobeacon_id = str(int(unprocessed_echobeacon_id, 16))
+            rssi_dbm = str(int(unprocessed_rssi, 16) - 256)
+
+            print_formatted_data(mac_address, echobeacon_id, rssi_dbm, packet_counter, scan_time)
         
-#         scan_time = str(scan_time)
-        
-#         device_data = device_data[16:] # Skip header
-
-#         unprocessed_echobeacon_id = device_data[:4]
-#         packet_type = device_data[4:6]
-#         packet_counter = device_data[6:8]
-#         mac_address = device_data[8:20]
-#         unprocessed_rssi = device_data[20:22]
-
-#         # Only consider echo packets
-#         if packet_type != "03":
-#             continue
-
-#         echobeacon_id = str(int(unprocessed_echobeacon_id, 16))
-#         rssi_dbm = str(int(unprocessed_rssi, 16) - 256)
-
-#         print_formatted_data(mac_address, echobeacon_id, rssi_dbm, packet_counter, scan_time)
-    
-#     return "Processed correctly", 200
+        return "Processed correctly", 200
 
 
 # Used to determine remaining battery percentage
-BATTERY_MAX_MILLIVOLTS = 3000
 
-@connected_to_database
-def process_device(curs, device):
-    # Parse raw payload
-    device_data = device.get("data")
-    if not device_data:
-        return
-    device_data = device_data[16:]  # skip gateway header
-    if len(device_data) < 28:
-        return
-    if device_data[4:6] != "03":  # presence packets only
-        return
-    if not (int(device_data[22:24], 16) & 0x04):  # require Eddystone TLM flag
-        return
+if flask_env == 'production':  
+    BATTERY_MAX_MILLIVOLTS = 3000
 
-    # Decode fields
-    beacon_mac_address = device_data[8:20]
-    packet_counter = int(device_data[6:8], 16)
-    eddy_volt = int(device_data[24:28], 16)
-    remaining_battery_percentage = round((eddy_volt / BATTERY_MAX_MILLIVOLTS) * 100, 1)
-    echobeacon_friendly = int(device_data[0:4], 16)
+    @connected_to_database
+    def process_device(curs, device):
+        # Parse raw payload
+        device_data = device.get("data")
+        if not device_data:
+            return
+        device_data = device_data[16:]  # skip gateway header
+        if len(device_data) < 28:
+            return
+        if device_data[4:6] != "03":  # presence packets only
+            return
+        if not (int(device_data[22:24], 16) & 0x04):  # require Eddystone TLM flag
+            return
 
-    # Resolve tag
-    curs.execute("""
-        SELECT id, packet_counter, previous_echobeacon
-        FROM tag
-        WHERE mac_address = %s
-    """, (beacon_mac_address,))
-    tag = curs.fetchone()
-    if not tag:
-        return
+        # Decode fields
+        beacon_mac_address = device_data[8:20]
+        packet_counter = int(device_data[6:8], 16)
+        eddy_volt = int(device_data[24:28], 16)
+        remaining_battery_percentage = round((eddy_volt / BATTERY_MAX_MILLIVOLTS) * 100, 1)
+        echobeacon_friendly = int(device_data[0:4], 16)
 
-    tag_id = tag['id']
-    old_packet_counter = tag['packet_counter']
-    prev_echobeacon_before = tag['previous_echobeacon']
-
-    # Update telemetry; set previous_echobeacon to current beacon only when packet changes
-    curs.execute("""
-        UPDATE tag
-        SET remaining_battery = %s,
-            packet_counter = CASE
-                WHEN packet_counter IS NULL OR %s <> packet_counter THEN %s
-                ELSE packet_counter
-            END,
-            previous_echobeacon = CASE
-                WHEN packet_counter IS NULL OR %s <> packet_counter
-                    THEN (SELECT id FROM activator_beacon WHERE friendly_number = %s)
-                ELSE previous_echobeacon
-            END
-        WHERE id = %s
-    """, (
-        remaining_battery_percentage,
-        packet_counter, packet_counter,
-        packet_counter, echobeacon_friendly,
-        tag_id
-    ))
-
-    # Ignore duplicates and first-ever packets (need a pair)
-    if old_packet_counter == packet_counter:
-        return
-    if old_packet_counter is None:
-        return
-
-    # Need a prior beacon to compute direction
-    previous_echobeacon_id = prev_echobeacon_before
-    if not previous_echobeacon_id:
-        return
-
-    # Current beacon (by friendly number)
-    curs.execute("""
-        SELECT id, shipyard_id, is_first_when_entering
-        FROM activator_beacon
-        WHERE friendly_number = %s
-    """, (echobeacon_friendly,))
-    current_beacon = curs.fetchone()
-    if not current_beacon:
-        return
-    current_beacon_id = current_beacon['id']
-    current_shipyard_id = current_beacon['shipyard_id']
-    current_is_first_when_entering = current_beacon['is_first_when_entering']
-
-    # No movement across same beacon
-    if previous_echobeacon_id == current_beacon_id:
-        return
-
-    # Previous beacon (by stored id)
-    curs.execute("""
-        SELECT shipyard_id, is_first_when_entering
-        FROM activator_beacon
-        WHERE id = %s
-    """, (previous_echobeacon_id,))
-    previous_beacon = curs.fetchone()
-    if not previous_beacon:
-        return
-    previous_shipyard_id = previous_beacon['shipyard_id']
-    previous_is_first_when_entering = previous_beacon['is_first_when_entering']
-
-    # Ignore cross-yard transitions
-    if current_shipyard_id != previous_shipyard_id:
-        return
-
-    # Direction from beacon pair
-    if previous_is_first_when_entering and not current_is_first_when_entering:
-        is_direction_entering = True
-    elif (not previous_is_first_when_entering) and current_is_first_when_entering:
-        is_direction_entering = False
-    else:
-        return  # invalid pair (e.g., two firsts or two seconds)
-
-    # Resolve assigned crew member (if any)
-    curs.execute("""
-        SELECT id
-        FROM crew_member
-        WHERE tag_id = %s
-    """, (tag_id,))
-    crew_member = curs.fetchone()
-
-    if not crew_member:
-        # Unassigned tag → record and reset pairing (prevents overlapping pairs)
+        # Resolve tag
         curs.execute("""
-            INSERT INTO unassigned_tag_entry (tag_id, shipyard_id, is_entering)
-            VALUES (%s, %s, %s)
-        """, (tag_id, current_shipyard_id, is_direction_entering))
-        curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
-        return
+            SELECT id, packet_counter, previous_echobeacon
+            FROM tag
+            WHERE mac_address = %s
+        """, (beacon_mac_address,))
+        tag = curs.fetchone()
+        if not tag:
+            return
 
-    crew_member_id = crew_member['id']
+        tag_id = tag['id']
+        old_packet_counter = tag['packet_counter']
+        prev_echobeacon_before = tag['previous_echobeacon']
 
-    if is_direction_entering:
-        # Open new log, then reset pairing
+        # Update telemetry; set previous_echobeacon to current beacon only when packet changes
         curs.execute("""
-            INSERT INTO permanence_log (crew_member_id, shipyard_id, entry_timestamp)
-            VALUES (%s, %s, NOW())
-        """, (crew_member_id, current_shipyard_id))
-        curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
-    else:
-        # Close most recent open log (or create exit-only), then reset pairing
+            UPDATE tag
+            SET remaining_battery = %s,
+                packet_counter = CASE
+                    WHEN packet_counter IS NULL OR %s <> packet_counter THEN %s
+                    ELSE packet_counter
+                END,
+                previous_echobeacon = CASE
+                    WHEN packet_counter IS NULL OR %s <> packet_counter
+                        THEN (SELECT id FROM activator_beacon WHERE friendly_number = %s)
+                    ELSE previous_echobeacon
+                END
+            WHERE id = %s
+        """, (
+            remaining_battery_percentage,
+            packet_counter, packet_counter,
+            packet_counter, echobeacon_friendly,
+            tag_id
+        ))
+
+        # Ignore duplicates and first-ever packets (need a pair)
+        if old_packet_counter == packet_counter:
+            return
+        if old_packet_counter is None:
+            return
+
+        # Need a prior beacon to compute direction
+        previous_echobeacon_id = prev_echobeacon_before
+        if not previous_echobeacon_id:
+            return
+
+        # Current beacon (by friendly number)
         curs.execute("""
-            UPDATE permanence_log
-            SET leave_timestamp = NOW()
-            WHERE id = (
-                SELECT id FROM permanence_log
-                WHERE crew_member_id = %s
-                  AND shipyard_id = %s
-                  AND leave_timestamp IS NULL
-                ORDER BY entry_timestamp DESC
-                LIMIT 1
-            )
-        """, (crew_member_id, current_shipyard_id))
-        if curs.rowcount == 0:
+            SELECT id, shipyard_id, is_first_when_entering
+            FROM activator_beacon
+            WHERE friendly_number = %s
+        """, (echobeacon_friendly,))
+        current_beacon = curs.fetchone()
+        if not current_beacon:
+            return
+        current_beacon_id = current_beacon['id']
+        current_shipyard_id = current_beacon['shipyard_id']
+        current_is_first_when_entering = current_beacon['is_first_when_entering']
+
+        # No movement across same beacon
+        if previous_echobeacon_id == current_beacon_id:
+            return
+
+        # Previous beacon (by stored id)
+        curs.execute("""
+            SELECT shipyard_id, is_first_when_entering
+            FROM activator_beacon
+            WHERE id = %s
+        """, (previous_echobeacon_id,))
+        previous_beacon = curs.fetchone()
+        if not previous_beacon:
+            return
+        previous_shipyard_id = previous_beacon['shipyard_id']
+        previous_is_first_when_entering = previous_beacon['is_first_when_entering']
+
+        # Ignore cross-yard transitions
+        if current_shipyard_id != previous_shipyard_id:
+            return
+
+        # Direction from beacon pair
+        if previous_is_first_when_entering and not current_is_first_when_entering:
+            is_direction_entering = True
+        elif (not previous_is_first_when_entering) and current_is_first_when_entering:
+            is_direction_entering = False
+        else:
+            return  # invalid pair (e.g., two firsts or two seconds)
+
+        # Resolve assigned crew member (if any)
+        curs.execute("""
+            SELECT id
+            FROM crew_member
+            WHERE tag_id = %s
+        """, (tag_id,))
+        crew_member = curs.fetchone()
+
+        if not crew_member:
+            # Unassigned tag → record and reset pairing (prevents overlapping pairs)
             curs.execute("""
-                INSERT INTO permanence_log (crew_member_id, shipyard_id, leave_timestamp)
+                INSERT INTO unassigned_tag_entry (tag_id, shipyard_id, is_entering)
+                VALUES (%s, %s, %s)
+            """, (tag_id, current_shipyard_id, is_direction_entering))
+            curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
+            return
+
+        crew_member_id = crew_member['id']
+
+        if is_direction_entering:
+            # Open new log, then reset pairing
+            curs.execute("""
+                INSERT INTO permanence_log (crew_member_id, shipyard_id, entry_timestamp)
                 VALUES (%s, %s, NOW())
             """, (crew_member_id, current_shipyard_id))
-        curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
+            curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
+        else:
+            # Close most recent open log (or create exit-only), then reset pairing
+            curs.execute("""
+                UPDATE permanence_log
+                SET leave_timestamp = NOW()
+                WHERE id = (
+                    SELECT id FROM permanence_log
+                    WHERE crew_member_id = %s
+                    AND shipyard_id = %s
+                    AND leave_timestamp IS NULL
+                    ORDER BY entry_timestamp DESC
+                    LIMIT 1
+                )
+            """, (crew_member_id, current_shipyard_id))
+            if curs.rowcount == 0:
+                curs.execute("""
+                    INSERT INTO permanence_log (crew_member_id, shipyard_id, leave_timestamp)
+                    VALUES (%s, %s, NOW())
+                """, (crew_member_id, current_shipyard_id))
+            curs.execute("UPDATE tag SET previous_echobeacon = NULL WHERE id = %s", (tag_id,))
 
 
-@app.route('/gateway-endpoint', methods=['POST'])
-def gateway_endpoint():
+    @app.route('/gateway-endpoint', methods=['POST'])
+    def gateway_endpoint():
 
-    json_data = request.json
+        json_data = request.json
 
-    data = json_data.get("data")
-    if not data:
-        return "Invalid gateway message", 400
+        data = json_data.get("data")
+        if not data:
+            return "Invalid gateway message", 400
 
-    value = data.get("value")
-    if not value:
-        return "Invalid gateway message", 400
-    
-    device_list = value.get("device_list")
-    if not device_list:
-        return "Invalid gateway message", 400
+        value = data.get("value")
+        if not value:
+            return "Invalid gateway message", 400
+        
+        device_list = value.get("device_list")
+        if not device_list:
+            return "Invalid gateway message", 400
 
-    for device in device_list:
-        process_device(device)
+        for device in device_list:
+            process_device(device)
 
-    return "Processed", 200
+        return "Processed", 200
 
 
 if __name__ == "__main__":
-    flask_env = get_env("FLASK_ENV")
     flask_port = int(get_env("FLASK_PORT"))
 
     match flask_env:
