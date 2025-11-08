@@ -1586,15 +1586,8 @@ def filter_shipyards(curs):
 
 if flask_env == 'development':
 
-    import threading
-    file_lock = threading.Lock()
-    f = open('log.txt', 'a')
-
     print("mac         |echo |rssi (dbm)|count|scan time   |HH:MM:SS.MMMMMM")
     print("------------+-----+----------+-----+------------+---------------")
-
-    f.write("mac         |echo |rssi (dbm)|count|scan time   |HH:MM:SS.MMMMMM\n")
-    f.write("------------+-----+----------+-----+------------+---------------\n")
 
     def print_formatted_data(mac, echo, rssi, count, scan_time):
 
@@ -1603,13 +1596,7 @@ if flask_env == 'development':
         # Format as HH:MM:SS.MMMMMM
         time_str = now.strftime("%H:%M:%S.%f")
 
-        printed_string = f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}|{scan_time.ljust(12)}|{time_str.ljust(15)}"
-
-        print(printed_string)
-
-        with file_lock:
-            f.write(printed_string + '\n')
-            f.flush()
+        print(f"{mac}|{echo.ljust(5)}|{rssi.ljust(10)}|{count.ljust(5)}|{scan_time.ljust(12)}|{time_str.ljust(15)}")
 
     @app.route('/gateway-endpoint', methods=['POST'])
     def gateway_endpoint():
