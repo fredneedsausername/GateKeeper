@@ -1648,7 +1648,7 @@ if flask_env == 'development':
 # Used to determine remaining battery percentage
 
 if flask_env == 'production':  
-    BATTERY_MAX_MILLIVOLTS = 3000
+    BATTERY_MAX_MILLIVOLTS = 3600
 
     @connected_to_database
     def process_device(curs, device):
