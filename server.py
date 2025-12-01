@@ -1829,6 +1829,15 @@ if flask_env == 'production':
 
         return "Processed", 200
 
+if flask_env == "json":
+    import json
+    
+    @app.route('/gateway-endpoint', methods=['POST'])
+    def gateway_endpoint():
+        json_data = request.json
+        print(json.dumps(json_data, indent=2))
+        return "Processed", 200
+
 
 if __name__ == "__main__":
     flask_port = int(get_env("FLASK_PORT"))
